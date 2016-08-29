@@ -49,7 +49,7 @@ final class Lock
     {
         $this->validityTimeEnd = $validityTimeEnd;
     }
-    
+
     /**
      * @return int
      */

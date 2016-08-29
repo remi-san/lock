@@ -6,7 +6,7 @@ use RemiSan\Lock\TokenGenerator;
 
 class FixedTokenGenerator implements TokenGenerator
 {
-    /** @var  string */
+    /** @var string */
     private $token;
 
     /**
@@ -20,7 +20,7 @@ class FixedTokenGenerator implements TokenGenerator
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function generateToken()
     {

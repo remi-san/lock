@@ -2,16 +2,15 @@
 
 namespace RemiSan\Lock;
 
-use RemiSan\Lock\Exceptions\LockingException;
 use RemiSan\Lock\Exceptions\UnlockingException;
 
 interface Locker
 {
     /**
-     * @param  string $resource Name of the resource to be locked
-     * @param  int    $ttl      Time in milliseconds for the lock to be held
-     * @param int     $retryDelay
-     * @param int     $retryCount
+     * @param string $resource   Name of the resource to be locked
+     * @param int    $ttl        Time in milliseconds for the lock to be held
+     * @param int    $retryDelay
+     * @param int    $retryCount
      *
      * @return Lock
      */
@@ -20,15 +19,14 @@ interface Locker
     /**
      * @param $resource
      *
-     * @return boolean
+     * @return bool
      */
     public function isResourceLocked($resource);
 
     /**
-     * @param  Lock $lock   The lock
+     * @param Lock $lock The lock
      *
      * @throws UnlockingException
-     * @return void
      */
     public function unlock(Lock $lock);
 }

@@ -41,7 +41,7 @@ final class RedLock implements Locker
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function lock($resource, $ttl = null, $retryDelay = 0, $retryCount = 0)
     {
@@ -51,6 +51,7 @@ final class RedLock implements Locker
         while (true) {
             try {
                 $this->lockAllInstances($lock, $ttl);
+
                 return $lock;
             } catch (LockingException $e) {
                 $this->resetLock($lock);
@@ -65,7 +66,7 @@ final class RedLock implements Locker
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function isResourceLocked($resource)
     {
@@ -79,12 +80,12 @@ final class RedLock implements Locker
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function unlock(Lock $lock)
     {
         foreach ($this->instances as $instance) {
-            if (! $this->unlockInstance($instance, $lock)) {
+            if (!$this->unlockInstance($instance, $lock)) {
                 if ($this->isInstanceResourceLocked($instance, $lock->getResource())) {
                     throw new UnlockingException(); // Only throw an exception if the lock is still present
                 }
@@ -103,7 +104,7 @@ final class RedLock implements Locker
         $timeMeasure = $this->stopwatch->start($lock->getToken());
 
         foreach ($this->instances as $instance) {
-            if (! $this->lockInstance($instance, $lock, $ttl)) {
+            if (!$this->lockInstance($instance, $lock, $ttl)) {
                 throw new LockingException();
             }
         }
@@ -132,9 +133,9 @@ final class RedLock implements Locker
     }
 
     /**
-     * @param  \Redis $instance Server instance to be locked
-     * @param  Lock    $lock     The lock instance
-     * @param  int    $ttl      Time to live in milliseconds
+     * @param \Redis $instance Server instance to be locked
+     * @param Lock   $lock     The lock instance
+     * @param int    $ttl      Time to live in milliseconds
      *
      * @return bool
      */
@@ -146,25 +147,25 @@ final class RedLock implements Locker
             $options['PX'] = (int) $ttl;
         }
 
-        return (boolean) $instance->set($lock->getResource(), (string) $lock->getToken(), $options);
+        return (bool) $instance->set($lock->getResource(), (string) $lock->getToken(), $options);
     }
 
     /**
      * @param \Redis $instance
      * @param string $resource
      *
-     * @return boolean
+     * @return bool
      */
     private function isInstanceResourceLocked(\Redis $instance, $resource)
     {
-        return (boolean) $instance->get($resource);
+        return (bool) $instance->get($resource);
     }
-    
+
     /**
-     * @param  \Redis $instance Server instance to be unlocked
-     * @param  Lock   $lock     The lock to unlock
+     * @param \Redis $instance Server instance to be unlocked
+     * @param Lock   $lock     The lock to unlock
      *
-     * @return boolean
+     * @return bool
      */
     private function unlockInstance(\Redis $instance, Lock $lock)
     {
@@ -176,7 +177,7 @@ final class RedLock implements Locker
             end
         ';
 
-        return (boolean) $instance->eval($script, [$lock->getResource(), (string) $lock->getToken()], 1);
+        return (bool) $instance->eval($script, [$lock->getResource(), (string) $lock->getToken()], 1);
     }
 
     /**
@@ -187,12 +188,12 @@ final class RedLock implements Locker
     private function setInstances(array $instances)
     {
         if (count($instances) === 0) {
-            throw new \InvalidArgumentException("You must provide at least one Redis instance.");
+            throw new \InvalidArgumentException('You must provide at least one Redis instance.');
         }
 
         foreach ($instances as $instance) {
-            if (! $instance->isConnected()) {
-                throw new \InvalidArgumentException("The Redis must be connected.");
+            if (!$instance->isConnected()) {
+                throw new \InvalidArgumentException('The Redis must be connected.');
             }
         }
 
@@ -208,7 +209,7 @@ final class RedLock implements Locker
     }
 
     /**
-     * Get the drift time based on ttl in ms
+     * Get the drift time based on ttl in ms.
      *
      * @param int $ttl
      *

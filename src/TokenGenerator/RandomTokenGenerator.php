@@ -7,7 +7,7 @@ use RemiSan\Lock\TokenGenerator;
 class RandomTokenGenerator implements TokenGenerator
 {
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function generateToken()
     {
