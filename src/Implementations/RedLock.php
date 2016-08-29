@@ -158,7 +158,7 @@ final class RedLock implements Locker
      */
     private function isInstanceResourceLocked(\Redis $instance, $resource)
     {
-        return (bool) $instance->get($resource);
+        return (bool) $instance->exists($resource);
     }
 
     /**
@@ -177,7 +177,11 @@ final class RedLock implements Locker
             end
         ';
 
-        return (bool) $instance->eval($script, [$lock->getResource(), (string) $lock->getToken()], 1);
+        return (bool) $instance->evaluate(
+            $script,
+            [$lock->getResource(), (string) $lock->getToken()],
+            1
+        );
     }
 
     /**

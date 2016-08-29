@@ -7,7 +7,6 @@ use RemiSan\Lock\Exceptions\LockingException;
 use RemiSan\Lock\Exceptions\UnlockingException;
 use RemiSan\Lock\Implementations\RedLock;
 use RemiSan\Lock\Lock;
-use RemiSan\Lock\Test\Mock\MockableRedis;
 use RemiSan\Lock\TokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 use Symfony\Component\Stopwatch\StopwatchEvent;
@@ -58,13 +57,13 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
      */
     public function setUp()
     {
-        $this->instance1 = \Mockery::mock(MockableRedis::class, function ($redis) {
+        $this->instance1 = \Mockery::mock(\Redis::class, function ($redis) {
             $redis->shouldReceive('isConnected')->andReturn(true);
         });
-        $this->instance2 = \Mockery::mock(MockableRedis::class, function ($redis) {
+        $this->instance2 = \Mockery::mock(\Redis::class, function ($redis) {
             $redis->shouldReceive('isConnected')->andReturn(true);
         });
-        $this->disconnectedInstance = \Mockery::mock(MockableRedis::class, function ($redis) {
+        $this->disconnectedInstance = \Mockery::mock(\Redis::class, function ($redis) {
             $redis->shouldReceive('isConnected')->andReturn(false);
         });
 
@@ -82,8 +81,6 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         $this->token = 'token';
 
         $this->originTime = 333;
-
-        MockableRedis::reset();
 
         $this->classUnderTest = new RedLock(
             [ $this->instance1, $this->instance2 ],
@@ -402,44 +399,52 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
     private function itWillUnlockTheResourceOnInstanceOne($times)
     {
-        MockableRedis::$expectedArgs = [ $this->resource, $this->token ];
-        MockableRedis::$expectedNumKeys = 1;
-
         $this->instance1
-            ->shouldReceive('getEvalReturn')
+            ->shouldReceive('evaluate')
+            ->with(
+                \Mockery::on(function () { return true; }),
+                [ $this->resource, $this->token ],
+                1
+            )
             ->andReturn(true)
             ->times($times);
     }
 
     private function itWillUnlockTheResourceOnInstanceTwo($times)
     {
-        MockableRedis::$expectedArgs = [ $this->resource, $this->token ];
-        MockableRedis::$expectedNumKeys = 1;
-
         $this->instance2
-            ->shouldReceive('getEvalReturn')
+            ->shouldReceive('evaluate')
+            ->with(
+                \Mockery::on(function () { return true; }),
+                [ $this->resource, $this->token ],
+                1
+            )
             ->andReturn(true)
             ->times($times);
     }
 
     private function itWillFailUnlockingTheResourceOnInstanceOne($times)
     {
-        MockableRedis::$expectedArgs = [ $this->resource, $this->token ];
-        MockableRedis::$expectedNumKeys = 1;
-
         $this->instance1
-            ->shouldReceive('getEvalReturn')
+            ->shouldReceive('evaluate')
+            ->with(
+                \Mockery::on(function () { return true; }),
+                [ $this->resource, $this->token ],
+                1
+            )
             ->andReturn(false)
             ->times($times);
     }
 
     private function itWillFailUnlockingTheResourceOnInstanceTwo($times)
     {
-        MockableRedis::$expectedArgs = [ $this->resource, $this->token ];
-        MockableRedis::$expectedNumKeys = 1;
-
         $this->instance2
-            ->shouldReceive('getEvalReturn')
+            ->shouldReceive('evaluate')
+            ->with(
+                \Mockery::on(function () { return true; }),
+                [ $this->resource, $this->token ],
+                1
+            )
             ->andReturn(false)
             ->times($times);
     }
@@ -447,7 +452,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     private function itWillAssertKeyHasBeenFoundInInstanceOne($times)
     {
         $this->instance1
-            ->shouldReceive('get')
+            ->shouldReceive('exists')
             ->andReturn(true)
             ->times($times);
     }
@@ -455,7 +460,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     private function itWillAssertKeyHasBeenFoundInInstanceTwo($times)
     {
         $this->instance2
-            ->shouldReceive('get')
+            ->shouldReceive('exists')
             ->andReturn(true)
             ->times($times);
     }
@@ -463,7 +468,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     private function itWillAssertKeyHasNotBeenFoundInInstanceOne($times)
     {
         $this->instance1
-            ->shouldReceive('get')
+            ->shouldReceive('exists')
             ->andReturn(false)
             ->times($times);
     }
@@ -471,7 +476,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     private function itWillAssertKeyHasNotBeenFoundInInstanceTwo($times)
     {
         $this->instance2
-            ->shouldReceive('get')
+            ->shouldReceive('exists')
             ->andReturn(false)
             ->times($times);
     }
