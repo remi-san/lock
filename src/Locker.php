@@ -10,11 +10,12 @@ interface Locker
     /**
      * @param  string $resource Name of the resource to be locked
      * @param  int    $ttl      Time in milliseconds for the lock to be held
+     * @param int     $retryDelay
+     * @param int     $retryCount
      *
-     * @throws LockingException
      * @return Lock
      */
-    public function lock($resource, $ttl);
+    public function lock($resource, $ttl, $retryDelay = 0, $retryCount = 0);
 
     /**
      * @param $resource

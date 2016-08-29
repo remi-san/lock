@@ -23,45 +23,32 @@ final class RedLock implements Locker
     /** @var Stopwatch */
     private $stopwatch;
 
-    /** @var int */
-    private $retryDelay;
-
-    /** @var int */
-    private $retryCount;
-
     /**
      * @param \Redis[]       $instances      Array of pre-connected \Redis objects
      * @param TokenGenerator $tokenGenerator The token generator
      * @param Stopwatch      $stopwatch      A way to measure time passed
-     * @param int            $retryDelay     Delay in milliseconds between retries
-     * @param int            $retryCount     Number of retries to attempt
      */
     public function __construct(
         array $instances,
         TokenGenerator $tokenGenerator,
-        Stopwatch $stopwatch,
-        $retryDelay = 0,
-        $retryCount = 0
+        Stopwatch $stopwatch
     ) {
         self::setInstances($instances);
 
         $this->instances = $instances;
         $this->tokenGenerator = $tokenGenerator;
         $this->stopwatch = $stopwatch;
-
-        $this->retryDelay = $retryDelay;
-        $this->retryCount = $retryCount;
     }
 
     /**
      * @inheritDoc
      */
-    public function lock($resource, $ttl = null)
+    public function lock($resource, $ttl = null, $retryDelay = 0, $retryCount = 0)
     {
         $lock = new Lock($resource, $this->tokenGenerator->generateToken());
 
         $tried = 0;
-        do {
+        while (true) {
             try {
                 $this->lockAllInstances($lock, $ttl);
                 return $lock;
@@ -69,12 +56,12 @@ final class RedLock implements Locker
                 $this->resetLock($lock);
             }
 
-            $this->waitBeforeRetrying();
+            if ($tried++ == $retryCount) {
+                throw new LockingException();
+            }
 
-            $tried++;
-        } while ($tried <= $this->retryCount);
-
-        throw new LockingException();
+            $this->waitBeforeRetrying($retryDelay);
+        }
     }
 
     /**
@@ -83,7 +70,7 @@ final class RedLock implements Locker
     public function isResourceLocked($resource)
     {
         foreach ($this->instances as $instance) {
-            if ($this->isInstanceResourceLocked($resource, $instance)) {
+            if ($this->isInstanceResourceLocked($instance, $resource)) {
                 return true;
             }
         }
@@ -124,9 +111,9 @@ final class RedLock implements Locker
         $timeMeasure->stop();
 
         if ($ttl) {
-            $validityTimeLeft = $ttl - ($timeMeasure->getDuration() + $this->getDrift($ttl));
+            $validityTimeLeft = $ttl - ($timeMeasure->getDuration() + self::getDrift($ttl));
 
-            if ($validityTimeLeft < 0) {
+            if ($validityTimeLeft <= 0) {
                 throw new LockingException();
             }
 
@@ -199,6 +186,10 @@ final class RedLock implements Locker
      */
     private function setInstances(array $instances)
     {
+        if (count($instances) === 0) {
+            throw new \InvalidArgumentException("You must provide at least one Redis instance.");
+        }
+
         foreach ($instances as $instance) {
             if (! $instance->isConnected()) {
                 throw new \InvalidArgumentException("The Redis must be connected.");
@@ -209,26 +200,29 @@ final class RedLock implements Locker
     }
 
     /**
+     * @param $retryDelay
+     */
+    private function waitBeforeRetrying($retryDelay)
+    {
+        usleep($retryDelay * 1000);
+    }
+
+    /**
      * Get the drift time based on ttl in ms
      *
      * @param int $ttl
      *
      * @return float
      */
-    private function getDrift($ttl)
+    private static function getDrift($ttl)
     {
         // Add 2 milliseconds to the drift to account for Redis expires
         // precision, which is 1 millisecond, plus 2 millisecond min drift
         // for small TTLs.
-        
-        return ($ttl * self::CLOCK_DRIFT_FACTOR) + 2;
-    }
 
-    /**
-     * @return void
-     */
-    private function waitBeforeRetrying()
-    {
-        usleep($this->retryDelay * 1000);
+        $redisExpiresPrecision = 2;
+        $minDrift = ($ttl) ? ceil($ttl * self::CLOCK_DRIFT_FACTOR) : 0;
+
+        return $minDrift + $redisExpiresPrecision;
     }
 }
