@@ -1,0 +1,30 @@
+{
+    "name": "remi-san/lock",
+    "description": "A locking lib",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Rémi San",
+            "email": "remi.san@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.5"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^1.12",
+        "squizlabs/php_codesniffer": "^2.0",
+        "phpunit/phpunit": "^4.5",
+        "Mockery/Mockery": "^0.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "RemiSan\\Lock\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RemiSan\\Lock\\Test\\": "tests/unit"
+        }
+    }
+}

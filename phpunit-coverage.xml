@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="./tests/phpunit-bootstrap.php" colors="true"
+         convertErrorsToExceptions="true" convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true" processIsolation="false"
+         stopOnFailure="false">
+    <testsuites>
+        <testsuite name="All">
+            <directory suffix=".php">./tests/unit/</directory>
+        </testsuite>
+    </testsuites>
+    <logging>
+        <log type="coverage-html" target="./tests/output/coverage/" charset="UTF-8" yui="true" highlight="true" />
+        <log type="junit" target="./tests/output/results/results.xml" logIncompleteSkipped="true" />
+    </logging>
+    <filter>
+        <blacklist>
+            <exclude>
+                <directory suffix=".php">./vendor</directory>
+                <directory suffix=".php">./tests/unit/Mock</directory>
+            </exclude>
+        </blacklist>
+        <whitelist processUncoveredFilesFromWhitelist="true">
+            <directory suffix=".php">./src</directory>
+            <exclude>
+                <directory suffix=".php">./vendor</directory>
+                <directory suffix=".php">./tests/unit/Mock</directory>
+            </exclude>
+        </whitelist>
+    </filter>
+</phpunit>
