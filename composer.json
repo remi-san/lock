@@ -29,5 +29,10 @@
         "psr-4": {
             "RemiSan\\Lock\\Test\\": "tests/unit"
         }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "0.1.x-dev"
+        }
     }
 }
