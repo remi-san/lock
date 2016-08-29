@@ -1,0 +1,234 @@
+<?php
+
+namespace RemiSan\Lock\Implementations;
+
+use RemiSan\Lock\Exceptions\LockingException;
+use RemiSan\Lock\Exceptions\UnlockingException;
+use RemiSan\Lock\Lock;
+use RemiSan\Lock\Locker;
+use RemiSan\Lock\TokenGenerator;
+use Symfony\Component\Stopwatch\Stopwatch;
+
+final class RedLock implements Locker
+{
+    /** @var float */
+    const CLOCK_DRIFT_FACTOR = 0.01;
+
+    /** @var \Redis[] */
+    private $instances = [];
+
+    /** @var TokenGenerator */
+    private $tokenGenerator;
+
+    /** @var Stopwatch */
+    private $stopwatch;
+
+    /** @var int */
+    private $retryDelay;
+
+    /** @var int */
+    private $retryCount;
+
+    /**
+     * @param \Redis[]       $instances      Array of pre-connected \Redis objects
+     * @param TokenGenerator $tokenGenerator The token generator
+     * @param Stopwatch      $stopwatch      A way to measure time passed
+     * @param int            $retryDelay     Delay in milliseconds between retries
+     * @param int            $retryCount     Number of retries to attempt
+     */
+    public function __construct(
+        array $instances,
+        TokenGenerator $tokenGenerator,
+        Stopwatch $stopwatch,
+        $retryDelay = 0,
+        $retryCount = 0
+    ) {
+        self::setInstances($instances);
+
+        $this->instances = $instances;
+        $this->tokenGenerator = $tokenGenerator;
+        $this->stopwatch = $stopwatch;
+
+        $this->retryDelay = $retryDelay;
+        $this->retryCount = $retryCount;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function lock($resource, $ttl = null)
+    {
+        $lock = new Lock($resource, $this->tokenGenerator->generateToken());
+
+        $tried = 0;
+        do {
+            try {
+                $this->lockAllInstances($lock, $ttl);
+                return $lock;
+            } catch (LockingException $e) {
+                $this->resetLock($lock);
+            }
+
+            $this->waitBeforeRetrying();
+
+            $tried++;
+        } while ($tried <= $this->retryCount);
+
+        throw new LockingException();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function isResourceLocked($resource)
+    {
+        foreach ($this->instances as $instance) {
+            if ($this->isInstanceResourceLocked($resource, $instance)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function unlock(Lock $lock)
+    {
+        foreach ($this->instances as $instance) {
+            if (! $this->unlockInstance($instance, $lock)) {
+                if ($this->isInstanceResourceLocked($instance, $lock->getResource())) {
+                    throw new UnlockingException(); // Only throw an exception if the lock is still present
+                }
+            }
+        }
+    }
+
+    /**
+     * @param Lock $lock
+     * @param int  $ttl
+     *
+     * @throws LockingException
+     */
+    private function lockAllInstances($lock, $ttl)
+    {
+        $timeMeasure = $this->stopwatch->start($lock->getToken());
+
+        foreach ($this->instances as $instance) {
+            if (! $this->lockInstance($instance, $lock, $ttl)) {
+                throw new LockingException();
+            }
+        }
+
+        $timeMeasure->stop();
+
+        if ($ttl) {
+            $validityTimeLeft = $ttl - ($timeMeasure->getDuration() + $this->getDrift($ttl));
+
+            if ($validityTimeLeft < 0) {
+                throw new LockingException();
+            }
+
+            $lock->setValidityTimeEnd($timeMeasure->getOrigin() + $ttl);
+        }
+    }
+
+    /**
+     * @param Lock $lock
+     */
+    private function resetLock($lock)
+    {
+        foreach ($this->instances as $instance) {
+            $this->unlockInstance($instance, $lock);
+        }
+    }
+
+    /**
+     * @param  \Redis $instance Server instance to be locked
+     * @param  Lock    $lock     The lock instance
+     * @param  int    $ttl      Time to live in milliseconds
+     *
+     * @return bool
+     */
+    private function lockInstance(\Redis $instance, Lock $lock, $ttl)
+    {
+        $options = ['NX'];
+
+        if ($ttl) {
+            $options['PX'] = (int) $ttl;
+        }
+
+        return (boolean) $instance->set($lock->getResource(), (string) $lock->getToken(), $options);
+    }
+
+    /**
+     * @param \Redis $instance
+     * @param string $resource
+     *
+     * @return boolean
+     */
+    private function isInstanceResourceLocked(\Redis $instance, $resource)
+    {
+        return (boolean) $instance->get($resource);
+    }
+    
+    /**
+     * @param  \Redis $instance Server instance to be unlocked
+     * @param  Lock   $lock     The lock to unlock
+     *
+     * @return boolean
+     */
+    private function unlockInstance(\Redis $instance, Lock $lock)
+    {
+        $script = '
+            if redis.call("GET", KEYS[1]) == ARGV[1] then
+                return redis.call("DEL", KEYS[1])
+            else
+                return 0
+            end
+        ';
+
+        return (boolean) $instance->eval($script, [$lock->getResource(), (string) $lock->getToken()], 1);
+    }
+
+    /**
+     * @param \Redis[] $instances
+     *
+     * @throws \Exception
+     */
+    private function setInstances(array $instances)
+    {
+        foreach ($instances as $instance) {
+            if (! $instance->isConnected()) {
+                throw new \InvalidArgumentException("The Redis must be connected.");
+            }
+        }
+
+        $this->instances = $instances;
+    }
+
+    /**
+     * Get the drift time based on ttl in ms
+     *
+     * @param int $ttl
+     *
+     * @return float
+     */
+    private function getDrift($ttl)
+    {
+        // Add 2 milliseconds to the drift to account for Redis expires
+        // precision, which is 1 millisecond, plus 2 millisecond min drift
+        // for small TTLs.
+        
+        return ($ttl * self::CLOCK_DRIFT_FACTOR) + 2;
+    }
+
+    /**
+     * @return void
+     */
+    private function waitBeforeRetrying()
+    {
+        usleep($this->retryDelay * 1000);
+    }
+}
