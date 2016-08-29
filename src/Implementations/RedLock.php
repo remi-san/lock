@@ -111,15 +111,15 @@ final class RedLock implements Locker
 
         $timeMeasure->stop();
 
-        if ($ttl) {
-            $validityTimeLeft = $ttl - ($timeMeasure->getDuration() + self::getDrift($ttl));
-
-            if ($validityTimeLeft <= 0) {
-                throw new LockingException();
-            }
-
-            $lock->setValidityTimeEnd($timeMeasure->getOrigin() + $ttl);
+        if (!$ttl) {
+            return;
         }
+
+        if (($ttl - ($timeMeasure->getDuration() + self::getDrift($ttl))) <= 0) {
+            throw new LockingException();
+        }
+
+        $lock->setValidityTimeEnd($timeMeasure->getOrigin() + $ttl);
     }
 
     /**
