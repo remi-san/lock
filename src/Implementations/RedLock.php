@@ -58,11 +58,13 @@ final class RedLock implements Locker
             }
 
             if ($tried++ == $retryCount) {
-                throw new LockingException();
+                break;
             }
 
             $this->waitBeforeRetrying($retryDelay);
         }
+
+        throw new LockingException();
     }
 
     /**
@@ -115,9 +117,7 @@ final class RedLock implements Locker
             return;
         }
 
-        if (($ttl - ($timeMeasure->getDuration() + self::getDrift($ttl))) <= 0) {
-            throw new LockingException();
-        }
+        self::checkTtl($timeMeasure->getDuration(), $ttl);
 
         $lock->setValidityTimeEnd($timeMeasure->getOrigin() + $ttl);
     }
@@ -210,6 +210,21 @@ final class RedLock implements Locker
     private function waitBeforeRetrying($retryDelay)
     {
         usleep($retryDelay * 1000);
+    }
+
+    /**
+     * @param int $elapsedTime
+     * @param int $ttl
+     *
+     * @throws LockingException
+     */
+    private static function checkTtl($elapsedTime, $ttl)
+    {
+        $adjustedElapsedTime = ($elapsedTime + self::getDrift($ttl));
+
+        if ($adjustedElapsedTime >= $ttl) {
+            throw new LockingException();
+        }
     }
 
     /**

@@ -144,7 +144,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldFailLockingTheResourceAfterRetryingIfTimeToLockHasBeenGreaterThanTtl()
+    public function itShouldFailLockingTheResourceAfterRetryingIfTimeToLockHasBeenGreaterThanTtlAndRetry()
     {
         $this->itWillGenerateAToken();
 
@@ -158,7 +158,64 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->setExpectedException(LockingException::class);
 
-        $this->classUnderTest->lock($this->resource, $this->ttl, $this->retryDelay, 1);
+        $stopwatch = new Stopwatch();
+        $timeMeasure = $stopwatch->start('test');
+
+        try {
+            $this->classUnderTest->lock($this->resource, $this->ttl, $this->retryDelay, 1);
+        } catch (\Exception $e) {
+            $timeMeasure->stop();
+            $this->assertLessThan($timeMeasure->getDuration(), $this->ttl);
+            throw $e;
+        }
+    }
+
+    /**
+     * @test
+     */
+    public function itShouldFailLockingIfOneInstanceCannotAcquireTheLockAndRetry()
+    {
+        $this->itWillGenerateAToken();
+
+        $this->itWillMeasureATimePassedLowerThanTtl();
+
+        $this->itWillSetValueOnRedisInstanceOneWithTtl(2);
+        $this->itWillFailSettingValueOnRedisInstanceTwoWithTtl(2);
+
+        $this->itWillUnlockTheResourceOnInstanceOne(2);
+        $this->itWillUnlockTheResourceOnInstanceTwo(2);
+
+        $this->setExpectedException(LockingException::class);
+
+        $stopwatch = new Stopwatch();
+        $timeMeasure = $stopwatch->start('test');
+
+        try {
+            $this->classUnderTest->lock($this->resource, $this->ttl, $this->retryDelay, 1);
+        } catch (\Exception $e) {
+            $timeMeasure->stop();
+            $this->assertLessThan($timeMeasure->getDuration(), $this->ttl);
+            throw $e;
+        }
+    }
+
+    /**
+     * @test
+     */
+    public function itShouldNotSetAValidityTimeEndIfNoTtlIsDefined()
+    {
+        $this->itWillGenerateAToken();
+
+        $this->itWillMeasureATimePassedOverTtlAndDrift();
+
+        $this->itWillSetValueOnRedisInstanceOneWithoutTtl(1);
+        $this->itWillSetValueOnRedisInstanceTwoWithoutTtl(1);
+
+        $lock = $this->classUnderTest->lock($this->resource, null, $this->retryDelay, $this->retryCount);
+
+        $this->assertEquals($this->resource, $lock->getResource());
+        $this->assertEquals($this->token, $lock->getToken());
+        $this->assertNull($lock->getValidityTimeEnd());
     }
 
     // TODO test other failing cases
@@ -347,15 +404,6 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillFailSettingValueOnRedisInstanceOneWithTtl($times)
-    {
-        $this->instance1
-            ->shouldReceive('set')
-            ->with($this->resource, $this->token, [ 'NX', 'PX' => $this->ttl ])
-            ->andReturn(false)
-            ->times($times);
-    }
-
     private function itWillFailSettingValueOnRedisInstanceTwoWithTtl($times)
     {
         $this->instance2
@@ -363,38 +411,6 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->with($this->resource, $this->token, [ 'NX', 'PX' => $this->ttl ])
             ->andReturn(false)
             ->times($times);
-    }
-
-    private function itWillFailSettingValueOnRedisInstanceOneWithoutTtl($times)
-    {
-        $this->instance1
-            ->shouldReceive('set')
-            ->with($this->resource, $this->token, [ 'NX' ])
-            ->andReturn(false)
-            ->times($times);
-    }
-
-    private function itWillFailSettingValueOnRedisInstanceTwoWithoutTtl($times)
-    {
-        $this->instance2
-            ->shouldReceive('set')
-            ->with($this->resource, $this->token, [ 'NX' ])
-            ->andReturn(false)
-            ->times($times);
-    }
-
-    private function itWillNotSetValueOnRedisInstanceOne($times)
-    {
-        $this->instance1
-            ->shouldReceive('set')
-            ->never();
-    }
-
-    private function itWillNotSetValueOnRedisInstanceTwo($times)
-    {
-        $this->instance2
-            ->shouldReceive('set')
-            ->never();
     }
 
     private function itWillUnlockTheResourceOnInstanceOne($times)
