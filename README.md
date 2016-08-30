@@ -6,6 +6,6 @@
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 [![Packagist Version](https://img.shields.io/packagist/v/remi-san/lock.svg?style=flat-square)](https://packagist.org/packages/remi-san/lock)
 [![Coverage Status](https://img.shields.io/scrutinizer/coverage/g/remi-san/lock.svg?style=flat-square)](https://scrutinizer-ci.com/g/remi-san/lock/code-structure)
-[![SensioLabsInsight](https://insight.sensiolabs.com/projects/45db8cbd-70a8-4c09-9b80-32b51ba92c86/small.png)](https://insight.sensiolabs.com/projects/45db8cbd-70a8-4c09-9b80-32b51ba92c86)
+[![SensioLabsInsight](https://insight.sensiolabs.com/projects/45db8cbd-70a8-4c09-9b80-32b51ba92c86/mini.png)](https://insight.sensiolabs.com/projects/45db8cbd-70a8-4c09-9b80-32b51ba92c86)
 
 Locking library
