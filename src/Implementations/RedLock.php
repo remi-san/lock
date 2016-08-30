@@ -23,6 +23,9 @@ final class RedLock implements Locker
     /** @var Stopwatch */
     private $stopwatch;
 
+    /** @var int */
+    private $quorum;
+
     /**
      * @param \Redis[]       $instances      Array of pre-connected \Redis objects
      * @param TokenGenerator $tokenGenerator The token generator
@@ -33,9 +36,9 @@ final class RedLock implements Locker
         TokenGenerator $tokenGenerator,
         Stopwatch $stopwatch
     ) {
-        self::setInstances($instances);
+        $this->setInstances($instances);
+        $this->setQuorum();
 
-        $this->instances = $instances;
         $this->tokenGenerator = $tokenGenerator;
         $this->stopwatch = $stopwatch;
     }
@@ -50,14 +53,12 @@ final class RedLock implements Locker
         $tried = 0;
         while (true) {
             try {
-                $this->lockAllInstances($lock, $ttl);
-
-                return $lock;
+                return $this->monitoredLockingOfAllInstances($lock, $ttl);
             } catch (LockingException $e) {
                 $this->resetLock($lock);
             }
 
-            if ($tried++ == $retryCount) {
+            if ($tried++ === $retryCount) {
                 break;
             }
 
@@ -100,36 +101,42 @@ final class RedLock implements Locker
      * @param int  $ttl
      *
      * @throws LockingException
+     *
+     * @return Lock
      */
-    private function lockAllInstances($lock, $ttl)
+    private function monitoredLockingOfAllInstances(Lock $lock, $ttl)
     {
         $timeMeasure = $this->stopwatch->start($lock->getToken());
-
-        foreach ($this->instances as $instance) {
-            if (!$this->lockInstance($instance, $lock, $ttl)) {
-                throw new LockingException();
-            }
-        }
-
+        $instancesLocked = $this->lockInstances($lock, $ttl);
         $timeMeasure->stop();
 
-        if (!$ttl) {
-            return;
+        $this->checkQuorum($instancesLocked);
+
+        if ($ttl) {
+            self::checkTtl($timeMeasure->getDuration(), $ttl);
+            $lock->setValidityTimeEnd($timeMeasure->getOrigin() + $ttl);
         }
 
-        self::checkTtl($timeMeasure->getDuration(), $ttl);
-
-        $lock->setValidityTimeEnd($timeMeasure->getOrigin() + $ttl);
+        return $lock;
     }
 
     /**
      * @param Lock $lock
+     * @param int  $ttl
+     *
+     * @return int The number of instances locked
      */
-    private function resetLock($lock)
+    private function lockInstances(Lock $lock, $ttl)
     {
+        $instancesLocked = 0;
+
         foreach ($this->instances as $instance) {
-            $this->unlockInstance($instance, $lock);
+            if ($this->lockInstance($instance, $lock, $ttl)) {
+                ++$instancesLocked;
+            }
         }
+
+        return $instancesLocked;
     }
 
     /**
@@ -148,6 +155,16 @@ final class RedLock implements Locker
         }
 
         return (bool) $instance->set($lock->getResource(), (string) $lock->getToken(), $options);
+    }
+
+    /**
+     * @param Lock $lock
+     */
+    private function resetLock($lock)
+    {
+        foreach ($this->instances as $instance) {
+            $this->unlockInstance($instance, $lock);
+        }
     }
 
     /**
@@ -202,6 +219,24 @@ final class RedLock implements Locker
         }
 
         $this->instances = $instances;
+    }
+
+    private function setQuorum()
+    {
+        $numberOfRedisInstances = count($this->instances);
+        $this->quorum = round(min($numberOfRedisInstances, ($numberOfRedisInstances / 2) + 1));
+    }
+
+    /**
+     * @param $instancesLocked
+     *
+     * @throws LockingException
+     */
+    private function checkQuorum($instancesLocked)
+    {
+        if ($instancesLocked < $this->quorum) {
+            throw new LockingException();
+        }
     }
 
     /**

@@ -173,7 +173,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldFailLockingIfOneInstanceCannotAcquireTheLockAndRetry()
+    public function itShouldFailLockingIfQuorumForTheAcquisitionOfTheLockIsNotMetAndItShouldRetry()
     {
         $this->itWillGenerateAToken();
 
@@ -236,7 +236,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldAssertTheResourceIsLockedIfTheForstInstanceHasTheResourceLocked()
+    public function itShouldAssertTheResourceIsLockedIfTheFirstInstanceHasTheResourceLocked()
     {
         $this->itWillAssertKeyHasBeenFoundInInstanceOne(1);
         $this->itWillAssertKeyHasBeenFoundInInstanceTwo(0);
