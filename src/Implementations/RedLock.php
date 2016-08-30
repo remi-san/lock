@@ -224,11 +224,11 @@ final class RedLock implements Locker
     private function setQuorum()
     {
         $numberOfRedisInstances = count($this->instances);
-        $this->quorum = round(min($numberOfRedisInstances, ($numberOfRedisInstances / 2) + 1));
+        $this->quorum = (int) round(min($numberOfRedisInstances, ($numberOfRedisInstances / 2) + 1));
     }
 
     /**
-     * @param $instancesLocked
+     * @param int $instancesLocked
      *
      * @throws LockingException
      */
@@ -240,7 +240,7 @@ final class RedLock implements Locker
     }
 
     /**
-     * @param $retryDelay
+     * @param int $retryDelay
      */
     private function waitBeforeRetrying($retryDelay)
     {
