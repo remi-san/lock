@@ -58,7 +58,7 @@ Usage
 You can acquire a lock on a resource by providing its name, the `ttl`,  the retry count and the time (in milliseconds) to wait before retrying.
 
 ```php
-$lock = $redLock->lock('my_resource_name', 1000, 3, 100);
+$lock = $locker->lock('my_resource_name', 1000, 3, 100);
 ```
 
 This example will try to lock the resource `my_resource_name` for 1 second (1000ms) and will retry to acquire it 3 times if it fails the first time (4 in total if all fail), waiting 100ms between each try.
@@ -72,7 +72,7 @@ If it failed being acquired, it will throw a `RemiSan\Lock\Exceptions\LockingExc
 You can ask the `Locker` if a resource is still locked.
 
 ```php
-$isLocked = $redLock->isLocked('my_resource_name');
+$isLocked = $locker->isLocked('my_resource_name');
 ```
 
 If the resource is still locked (lock has been acquired and ttl hasn't expired), it will return `true`, it will return false otherwise.
@@ -82,7 +82,7 @@ If the resource is still locked (lock has been acquired and ttl hasn't expired),
 To release a lock you have to provide it to the `Locker`.
 
 ```php
-$redLock->unlock($lock);
+$locker->unlock($lock);
 ```
 
 If the lock is still active, it will release it. If it fails but the lock wasn't active anymore, it won't cause any error.
