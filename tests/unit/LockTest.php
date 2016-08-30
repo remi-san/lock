@@ -13,7 +13,7 @@ class LockTest extends \PHPUnit_Framework_TestCase
     private $token;
 
     /** @var int */
-    private $validityTimeEnd;
+    private $validityEndTime;
 
     /** @var Lock */
     private $classUnderTest;
@@ -25,7 +25,7 @@ class LockTest extends \PHPUnit_Framework_TestCase
     {
         $this->resource = '';
         $this->token = '';
-        $this->validityTimeEnd = microtime(true) * 1000;
+        $this->validityEndTime = (int) microtime(true) * 1000;
 
         $this->classUnderTest = new Lock($this->resource, $this->token);
     }
@@ -42,7 +42,7 @@ class LockTest extends \PHPUnit_Framework_TestCase
     {
         $this->assertEquals($this->resource, $this->classUnderTest->getResource());
         $this->assertEquals($this->token, $this->classUnderTest->getToken());
-        $this->assertNull($this->classUnderTest->getValidityTimeEnd());
+        $this->assertNull($this->classUnderTest->getValidityEndTime());
     }
 
     /**
@@ -50,7 +50,7 @@ class LockTest extends \PHPUnit_Framework_TestCase
      */
     public function validityTimeEndIsSettable()
     {
-        $this->classUnderTest->setValidityTimeEnd($this->validityTimeEnd);
-        $this->assertEquals($this->validityTimeEnd, $this->classUnderTest->getValidityTimeEnd());
+        $this->classUnderTest->setValidityEndTime($this->validityEndTime);
+        $this->assertEquals($this->validityEndTime, $this->classUnderTest->getValidityEndTime());
     }
 }

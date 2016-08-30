@@ -7,23 +7,29 @@ use RemiSan\Lock\Exceptions\UnlockingException;
 interface Locker
 {
     /**
+     * Lock a resource.
+     *
      * @param string $resource   Name of the resource to be locked
      * @param int    $ttl        Time in milliseconds for the lock to be held
-     * @param int    $retryDelay
-     * @param int    $retryCount
+     * @param int    $retryCount The number of times to retry locking
+     * @param int    $retryDelay The time in milliseconds to wait before retrying
      *
      * @return Lock
      */
-    public function lock($resource, $ttl, $retryDelay = 0, $retryCount = 0);
+    public function lock($resource, $ttl, $retryCount = 0, $retryDelay = 0);
 
     /**
-     * @param $resource
+     * Check if a resource is locked.
+     *
+     * @param string $resource
      *
      * @return bool
      */
-    public function isResourceLocked($resource);
+    public function isLocked($resource);
 
     /**
+     * Unlock a resource.
+     *
      * @param Lock $lock The lock
      *
      * @throws UnlockingException

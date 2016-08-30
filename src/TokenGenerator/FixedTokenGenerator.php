@@ -12,7 +12,7 @@ class FixedTokenGenerator implements TokenGenerator
     /**
      * FixedTokenGenerator constructor.
      *
-     * @param string $token
+     * @param string $token The token to return
      */
     public function __construct($token)
     {

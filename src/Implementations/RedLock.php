@@ -27,6 +27,8 @@ final class RedLock implements Locker
     private $quorum;
 
     /**
+     * RedLock constructor.
+     *
      * @param \Redis[]       $instances      Array of pre-connected \Redis objects
      * @param TokenGenerator $tokenGenerator The token generator
      * @param Stopwatch      $stopwatch      A way to measure time passed
@@ -48,7 +50,7 @@ final class RedLock implements Locker
      */
     public function lock($resource, $ttl = null, $retryDelay = 0, $retryCount = 0)
     {
-        $lock = new Lock($resource, $this->tokenGenerator->generateToken());
+        $lock = new Lock((string) $resource, $this->tokenGenerator->generateToken());
 
         $tried = 0;
         while (true) {
@@ -65,16 +67,16 @@ final class RedLock implements Locker
             $this->waitBeforeRetrying($retryDelay);
         }
 
-        throw new LockingException();
+        throw new LockingException('Failed locking the resource.');
     }
 
     /**
      * {@inheritdoc}
      */
-    public function isResourceLocked($resource)
+    public function isLocked($resource)
     {
         foreach ($this->instances as $instance) {
-            if ($this->isInstanceResourceLocked($instance, $resource)) {
+            if ($this->isInstanceResourceLocked($instance, (string) $resource)) {
                 return true;
             }
         }
@@ -90,15 +92,21 @@ final class RedLock implements Locker
         foreach ($this->instances as $instance) {
             if (!$this->unlockInstance($instance, $lock)) {
                 if ($this->isInstanceResourceLocked($instance, $lock->getResource())) {
-                    throw new UnlockingException(); // Only throw an exception if the lock is still present
+                    // Only throw an exception if the lock is still present
+                    throw new UnlockingException('Failed releasing the lock.');
                 }
             }
         }
     }
 
     /**
-     * @param Lock $lock
-     * @param int  $ttl
+     * Try locking all Redis instances.
+     *
+     * Measure the time to do it and reject if not enough Redis instance have successfully
+     * locked the resource or if time to lock all instances have exceeded the ttl.
+     *
+     * @param Lock $lock The lock instance
+     * @param int  $ttl  Time to live in milliseconds
      *
      * @throws LockingException
      *
@@ -114,15 +122,17 @@ final class RedLock implements Locker
 
         if ($ttl) {
             self::checkTtl($timeMeasure->getDuration(), $ttl);
-            $lock->setValidityTimeEnd($timeMeasure->getOrigin() + $ttl);
+            $lock->setValidityEndTime($timeMeasure->getOrigin() + $ttl);
         }
 
         return $lock;
     }
 
     /**
-     * @param Lock $lock
-     * @param int  $ttl
+     * Lock resource in Redis instances and count how many instance did it with success.
+     *
+     * @param Lock $lock The lock instance
+     * @param int  $ttl  Time to live in milliseconds
      *
      * @return int The number of instances locked
      */
@@ -140,6 +150,8 @@ final class RedLock implements Locker
     }
 
     /**
+     * Lock the resource on a given Redis instance.
+     *
      * @param \Redis $instance Server instance to be locked
      * @param Lock   $lock     The lock instance
      * @param int    $ttl      Time to live in milliseconds
@@ -158,7 +170,9 @@ final class RedLock implements Locker
     }
 
     /**
-     * @param Lock $lock
+     * Unlock the resource on all Redis instances.
+     *
+     * @param Lock $lock The lock to release
      */
     private function resetLock($lock)
     {
@@ -168,8 +182,10 @@ final class RedLock implements Locker
     }
 
     /**
-     * @param \Redis $instance
-     * @param string $resource
+     * Checks if the resource exists on a given Redis instance.
+     *
+     * @param \Redis $instance The Redis instance
+     * @param string $resource The name of the resource
      *
      * @return bool
      */
@@ -179,6 +195,12 @@ final class RedLock implements Locker
     }
 
     /**
+     * Unlock the resource on a given Redis instance.
+     *
+     * If the lock is successfully released, it will return true.
+     * If the token provided by the lock doesn't correspond to the token stored, it will return false.
+     * If the lock is not found, it will return false.
+     *
      * @param \Redis $instance Server instance to be unlocked
      * @param Lock   $lock     The lock to unlock
      *
@@ -202,9 +224,14 @@ final class RedLock implements Locker
     }
 
     /**
-     * @param \Redis[] $instances
+     * Init all Redis instances passed to the constructor.
      *
-     * @throws \Exception
+     * If no Redis instance is given, it will return a InvalidArgumentException.
+     * If one or more Redis instance is not connected, it will return a InvalidArgumentException.
+     *
+     * @param \Redis[] $instances The connected Redis instances
+     *
+     * @throws \InvalidArgumentException
      */
     private function setInstances(array $instances)
     {
@@ -221,6 +248,9 @@ final class RedLock implements Locker
         $this->instances = $instances;
     }
 
+    /**
+     * Set the quorum based on the number of instances passed to the constructor.
+     */
     private function setQuorum()
     {
         $numberOfRedisInstances = count($this->instances);
@@ -228,19 +258,23 @@ final class RedLock implements Locker
     }
 
     /**
-     * @param int $instancesLocked
+     * Check if the number of instances that have been locked reach the quorum.
+     *
+     * @param int $instancesLocked The number of instances that have been locked
      *
      * @throws LockingException
      */
     private function checkQuorum($instancesLocked)
     {
         if ($instancesLocked < $this->quorum) {
-            throw new LockingException();
+            throw new LockingException('Quorum has not been met.');
         }
     }
 
     /**
-     * @param int $retryDelay
+     * Make the script wait before retrying to lock.
+     *
+     * @param int $retryDelay The retry delay in milliseconds
      */
     private function waitBeforeRetrying($retryDelay)
     {
@@ -248,8 +282,13 @@ final class RedLock implements Locker
     }
 
     /**
-     * @param int $elapsedTime
-     * @param int $ttl
+     * Checks if the elapsed time is inferior to the ttl.
+     *
+     * To the elapsed time is added a drift time to have a margin of error.
+     * If this adjusted time is greater than the ttl, it will throw a LockingException.
+     *
+     * @param int $elapsedTime The time elapsed in milliseconds
+     * @param int $ttl         The time to live in milliseconds
      *
      * @throws LockingException
      */
@@ -258,14 +297,14 @@ final class RedLock implements Locker
         $adjustedElapsedTime = ($elapsedTime + self::getDrift($ttl));
 
         if ($adjustedElapsedTime >= $ttl) {
-            throw new LockingException();
+            throw new LockingException('Time to lock the resource has exceeded the ttl.');
         }
     }
 
     /**
      * Get the drift time based on ttl in ms.
      *
-     * @param int $ttl
+     * @param int $ttl The time to live in milliseconds
      *
      * @return float
      */

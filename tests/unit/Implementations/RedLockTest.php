@@ -138,7 +138,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals($this->resource, $lock->getResource());
         $this->assertEquals($this->token, $lock->getToken());
-        $this->assertEquals($this->originTime + $this->ttl, $lock->getValidityTimeEnd());
+        $this->assertEquals($this->originTime + $this->ttl, $lock->getValidityEndTime());
     }
 
     /**
@@ -215,7 +215,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals($this->resource, $lock->getResource());
         $this->assertEquals($this->token, $lock->getToken());
-        $this->assertNull($lock->getValidityTimeEnd());
+        $this->assertNull($lock->getValidityEndTime());
     }
 
     // TODO test other failing cases
@@ -228,7 +228,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         $this->itWillAssertKeyHasNotBeenFoundInInstanceOne(1);
         $this->itWillAssertKeyHasBeenFoundInInstanceTwo(1);
 
-        $isLocked = $this->classUnderTest->isResourceLocked($this->resource);
+        $isLocked = $this->classUnderTest->isLocked($this->resource);
 
         $this->assertTrue($isLocked);
     }
@@ -241,7 +241,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         $this->itWillAssertKeyHasBeenFoundInInstanceOne(1);
         $this->itWillAssertKeyHasBeenFoundInInstanceTwo(0);
 
-        $isLocked = $this->classUnderTest->isResourceLocked($this->resource);
+        $isLocked = $this->classUnderTest->isLocked($this->resource);
 
         $this->assertTrue($isLocked);
     }
@@ -254,7 +254,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         $this->itWillAssertKeyHasNotBeenFoundInInstanceOne(1);
         $this->itWillAssertKeyHasNotBeenFoundInInstanceTwo(1);
 
-        $isLocked = $this->classUnderTest->isResourceLocked($this->resource);
+        $isLocked = $this->classUnderTest->isLocked($this->resource);
 
         $this->assertFalse($isLocked);
     }
