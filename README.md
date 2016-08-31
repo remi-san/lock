@@ -32,7 +32,7 @@ Token Generators
 
 As the `Locker` will need to generate a unique token to lock the `resource`, a `TokenGenerator` interface has been defined, and 2 implementations are available:
 
-- `RandomTokenGenerator` which will provide a random `md5 hash`
+- `RandomTokenGenerator` which will provide a random token.
 - `FixedTokenGenerator` which will always provide the token passed in the constructor.
 
 **Examples:**

@@ -28,7 +28,7 @@ final class MultipleInstanceLocker implements Locker
     /**
      * RedLock constructor.
      *
-     * @param Connection\[]  $instances      Array of persistence system connections
+     * @param Connection[]   $instances      Array of persistence system connections
      * @param TokenGenerator $tokenGenerator The token generator
      * @param Quorum         $quorum         The quorum implementation to use
      * @param Stopwatch      $stopwatch      A way to measure time passed

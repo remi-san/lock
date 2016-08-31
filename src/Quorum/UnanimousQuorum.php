@@ -33,6 +33,6 @@ class UnanimousQuorum implements Quorum
             throw new \InvalidArgumentException();
         }
 
-        return $numberOfSuccess >= $this->quorum;
+        return $numberOfSuccess === $this->quorum;
     }
 }

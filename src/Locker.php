@@ -16,7 +16,7 @@ interface Locker
      *
      * @return Lock
      */
-    public function lock($resource, $ttl, $retryCount = 0, $retryDelay = 0);
+    public function lock($resource, $ttl = null, $retryCount = 0, $retryDelay = 0);
 
     /**
      * Check if a resource is locked.
