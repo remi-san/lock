@@ -1,7 +1,8 @@
 <?php
 
-namespace RemiSan\Lock\Implementations;
+namespace RemiSan\Lock\Locker;
 
+use RemiSan\Lock\Connection;
 use RemiSan\Lock\Exceptions\LockingException;
 use RemiSan\Lock\Exceptions\UnlockingException;
 use RemiSan\Lock\Lock;
@@ -10,12 +11,9 @@ use RemiSan\Lock\Quorum;
 use RemiSan\Lock\TokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 
-final class RedLock implements Locker
+final class MultipleInstanceLocker implements Locker
 {
-    /** @var float */
-    const CLOCK_DRIFT_FACTOR = 0.01;
-
-    /** @var \Redis[] */
+    /** @var Connection[] */
     private $instances = [];
 
     /** @var TokenGenerator */
@@ -30,7 +28,7 @@ final class RedLock implements Locker
     /**
      * RedLock constructor.
      *
-     * @param \Redis[]       $instances      Array of pre-connected \Redis objects
+     * @param Connection\[]  $instances      Array of persistence system connections
      * @param TokenGenerator $tokenGenerator The token generator
      * @param Quorum         $quorum         The quorum implementation to use
      * @param Stopwatch      $stopwatch      A way to measure time passed
@@ -79,7 +77,7 @@ final class RedLock implements Locker
     public function isLocked($resource)
     {
         foreach ($this->instances as $instance) {
-            if ($this->isInstanceResourceLocked($instance, (string) $resource)) {
+            if ($instance->exists((string) $resource)) {
                 return true;
             }
         }
@@ -93,8 +91,8 @@ final class RedLock implements Locker
     public function unlock(Lock $lock)
     {
         foreach ($this->instances as $instance) {
-            if (!$this->unlockInstance($instance, $lock)) {
-                if ($this->isInstanceResourceLocked($instance, $lock->getResource())) {
+            if (!$instance->delete($lock)) {
+                if ($instance->exists($lock->getResource())) {
                     // Only throw an exception if the lock is still present
                     throw new UnlockingException('Failed releasing the lock.');
                 }
@@ -103,9 +101,9 @@ final class RedLock implements Locker
     }
 
     /**
-     * Try locking all Redis instances.
+     * Try locking all connected instances.
      *
-     * Measure the time to do it and reject if not enough Redis instance have successfully
+     * Measure the time to do it and reject if not enough connected instance have successfully
      * locked the resource or if time to lock all instances have exceeded the ttl.
      *
      * @param Lock $lock The lock instance
@@ -124,7 +122,7 @@ final class RedLock implements Locker
         $this->checkQuorum($instancesLocked);
 
         if ($ttl) {
-            self::checkTtl($timeMeasure->getDuration(), $ttl);
+            $this->checkTtl($timeMeasure->getDuration(), $ttl);
             $lock->setValidityEndTime($timeMeasure->getOrigin() + $ttl);
         }
 
@@ -132,7 +130,7 @@ final class RedLock implements Locker
     }
 
     /**
-     * Lock resource in Redis instances and count how many instance did it with success.
+     * Lock resource in connected instances and count how many instance did it with success.
      *
      * @param Lock $lock The lock instance
      * @param int  $ttl  Time to live in milliseconds
@@ -144,32 +142,12 @@ final class RedLock implements Locker
         $instancesLocked = 0;
 
         foreach ($this->instances as $instance) {
-            if ($this->lockInstance($instance, $lock, $ttl)) {
+            if ($instance->set($lock, $ttl)) {
                 ++$instancesLocked;
             }
         }
 
         return $instancesLocked;
-    }
-
-    /**
-     * Lock the resource on a given Redis instance.
-     *
-     * @param \Redis $instance Server instance to be locked
-     * @param Lock   $lock     The lock instance
-     * @param int    $ttl      Time to live in milliseconds
-     *
-     * @return bool
-     */
-    private function lockInstance(\Redis $instance, Lock $lock, $ttl)
-    {
-        $options = ['NX'];
-
-        if ($ttl) {
-            $options['PX'] = (int) $ttl;
-        }
-
-        return (bool) $instance->set($lock->getResource(), (string) $lock->getToken(), $options);
     }
 
     /**
@@ -180,50 +158,8 @@ final class RedLock implements Locker
     private function resetLock($lock)
     {
         foreach ($this->instances as $instance) {
-            $this->unlockInstance($instance, $lock);
+            $instance->delete($lock);
         }
-    }
-
-    /**
-     * Checks if the resource exists on a given Redis instance.
-     *
-     * @param \Redis $instance The Redis instance
-     * @param string $resource The name of the resource
-     *
-     * @return bool
-     */
-    private function isInstanceResourceLocked(\Redis $instance, $resource)
-    {
-        return (bool) $instance->get($resource);
-    }
-
-    /**
-     * Unlock the resource on a given Redis instance.
-     *
-     * If the lock is successfully released, it will return true.
-     * If the token provided by the lock doesn't correspond to the token stored, it will return false.
-     * If the lock is not found, it will return false.
-     *
-     * @param \Redis $instance Server instance to be unlocked
-     * @param Lock   $lock     The lock to unlock
-     *
-     * @return bool
-     */
-    private function unlockInstance(\Redis $instance, Lock $lock)
-    {
-        $script = '
-            if redis.call("GET", KEYS[1]) == ARGV[1] then
-                return redis.call("DEL", KEYS[1])
-            else
-                return 0
-            end
-        ';
-
-        return (bool) $instance->evaluate(
-            $script,
-            [$lock->getResource(), (string) $lock->getToken()],
-            1
-        );
     }
 
     /**
@@ -240,12 +176,6 @@ final class RedLock implements Locker
     {
         if (count($instances) === 0) {
             throw new \InvalidArgumentException('You must provide at least one Redis instance.');
-        }
-
-        foreach ($instances as $instance) {
-            if (!$instance->isConnected()) {
-                throw new \InvalidArgumentException('The Redis must be connected.');
-            }
         }
 
         $this->instances = $instances;
@@ -297,9 +227,9 @@ final class RedLock implements Locker
      *
      * @throws LockingException
      */
-    private static function checkTtl($elapsedTime, $ttl)
+    private function checkTtl($elapsedTime, $ttl)
     {
-        $adjustedElapsedTime = ($elapsedTime + self::getDrift($ttl));
+        $adjustedElapsedTime = ($elapsedTime + $this->getDrift($ttl));
 
         if ($adjustedElapsedTime >= $ttl) {
             throw new LockingException('Time to lock the resource has exceeded the ttl.');
@@ -313,15 +243,8 @@ final class RedLock implements Locker
      *
      * @return float
      */
-    private static function getDrift($ttl)
+    private function getDrift($ttl)
     {
-        // Add 2 milliseconds to the drift to account for Redis expires
-        // precision, which is 1 millisecond, plus 1 millisecond min drift
-        // for small TTLs.
-
-        $redisExpiresPrecision = 2;
-        $minDrift = ($ttl) ? ceil($ttl * self::CLOCK_DRIFT_FACTOR) : 0;
-
-        return $minDrift + $redisExpiresPrecision;
+        return array_values($this->instances)[0]->getDrift($ttl);
     }
 }

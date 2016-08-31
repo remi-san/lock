@@ -53,54 +53,12 @@ echo $tokenGenerator->generateToken(); // 'my_token'
 
 Usage
 --------
-**Acquire a lock**
-
-You can acquire a lock on a resource by providing its name, the `ttl`,  the retry count and the time (in milliseconds) to wait before retrying.
-
-```php
-$lock = $locker->lock('my_resource_name', 1000, 3, 100);
-```
-
-This example will try to lock the resource `my_resource_name` for 1 second (1000ms) and will retry to acquire it 3 times if it fails the first time (4 in total if all fail), waiting 100ms between each try.
-
-If the lock is acquired, it will return a `Lock` object describing it.
-
-If it failed being acquired, it will throw a `RemiSan\Lock\Exceptions\LockingException`.
-
-**Assert if a lock exists**
-
-You can ask the `Locker` if a resource is still locked.
-
-```php
-$isLocked = $locker->isLocked('my_resource_name');
-```
-
-If the resource is still locked (lock has been acquired and ttl hasn't expired), it will return `true`, it will return false otherwise.
-
-**Release a lock**
-
-To release a lock you have to provide it to the `Locker`.
-
-```php
-$locker->unlock($lock);
-```
-
-If the lock is still active, it will release it. If it fails but the lock wasn't active anymore, it won't cause any error.
-
-If it fails releasing the lock and the lock is still active, it will throw a `RemiSan\Lock\Exceptions\UnlockingException`.
-
-Redis Implementation
--------------------------------
-Based on [Redlock-rb](https://github.com/antirez/redlock-rb) by [Salvatore Sanfilippo](https://github.com/antirez) and [ronnylt/redlock-php](https://github.com/ronnylt/redlock-php).
-
-This library implements the Redis-based distributed lock manager algorithm [described in this Redis article](http://redis.io/topics/distlock).
 
 **Create**
 
-You can create a `Redis Locker` or `RedLock` by providing an array of connected `Redis` instances.
-
 ```php
-use RemiSan\Lock\Implementations\RedLock;
+use RemiSan\Lock\Connection\RedisConnection;
+use RemiSan\Lock\Locker\MultipleInstanceLocker;
 use RemiSan\Lock\Quorum\MajorityQuorum;
 use RemiSan\Lock\TokenGenerator\RandomTokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
@@ -115,25 +73,70 @@ $tokenGenerator = new RandomTokenGenerator();
 $quorum = new MajorityQuorum();
 $stopwatch = new Stopwatch();
 
-$redLock = new RedLock([ $instance1, $instance2 ], $tokenGenerator, $quorum, $stopwatch);
+$redLock = new MultipleInstanceLocker(
+    [ new RedisConnection($instance1), new RedisConnection($instance2) ],
+    $tokenGenerator,
+    $quorum,
+    $stopwatch
+);
 ```
 
-This class works as described earlier but has some specificity due to the use of multiple `Redis` instances.
 
 **Acquire a lock**
 
-The lock will be acquired only if the number of instances of `Redis` have been able to acquire the lock meet the quorum (the calculation of the `quorum` is made according to the implementation of `Quorum` passed to `RedLock`).
+You can acquire a lock on a resource by providing its name, the `ttl`,  the retry count and the time (in milliseconds) to wait before retrying.
+
+```php
+$lock = $locker->lock('my_resource_name', 1000, 3, 100);
+```
+
+This example will try to lock the resource `my_resource_name` for 1 second (1000ms) and will retry to acquire it 3 times if it fails the first time (4 in total if all fail), waiting 100ms between each try.
+
+If the lock is acquired, it will return a `Lock` object describing it.
+
+If it failed being acquired, it will throw a `RemiSan\Lock\Exceptions\LockingException`.
+
+The lock will be acquired only if the number of instances that have been able to acquire the lock meet the quorum (the calculation of the `quorum` is made according to the implementation of `Quorum` passed to the `MultipleInstanceLocker`).
+
 
 **Assert if a lock exists**
 
-If at least one `Redis` instance has the lock, it will consider having the lock.
+You can ask the `Locker` if a resource is still locked.
+
+```php
+$isLocked = $locker->isLocked('my_resource_name');
+```
+
+If the resource is still locked (lock has been acquired and ttl hasn't expired), it will return `true`, it will return false otherwise.
+
+If at least one connected instance has the lock, it will consider having the lock.
+
 
 **Release a lock**
 
-If at least one `Redis` instance fails releasing the lock while still detaining it, the exception will be thrown.
+To release a lock you have to provide it to the `Locker`.
+
+```php
+$locker->unlock($lock);
+```
+
+If the lock is still active, it will release it. If it fails but the lock wasn't active anymore, it won't cause any error.
+
+If it fails releasing the lock and the lock is still active, it will throw a `RemiSan\Lock\Exceptions\UnlockingException`.
+
+If at least one connected instance fails releasing the lock while still detaining it, the exception will be thrown.
+
+
+Redis Connection
+-------------------------------
+Based on [Redlock-rb](https://github.com/antirez/redlock-rb) by [Salvatore Sanfilippo](https://github.com/antirez) and [ronnylt/redlock-php](https://github.com/ronnylt/redlock-php).
+
+This library implements the Redis-based distributed lock manager algorithm [described in this Redis article](http://redis.io/topics/distlock).
+
+This lib provides a `RedisConnection` implementing the `RedLock` mechanism.
 
 **DISCLAIMER**: As stated in the original `antirez` version, this code implements an algorithm which is currently a proposal, it was not formally analyzed. Make sure to understand how it works before using it in your production environments.
 
-Other Implementations
+Other Connections
 ---------------------------------
 That will come at some point, but it's not there yet.

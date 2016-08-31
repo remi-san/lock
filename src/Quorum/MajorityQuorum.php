@@ -26,7 +26,7 @@ class MajorityQuorum implements Quorum
         }
 
         $this->total = $totalNumber;
-        $this->quorum = floor($totalNumber / 2) + 1;
+        $this->quorum = (int) floor($totalNumber / 2) + 1;
     }
 
     /**
