@@ -101,6 +101,8 @@ You can create a `Redis Locker` or `RedLock` by providing an array of connected 
 
 ```php
 use RemiSan\Lock\Implementations\RedLock;
+use RemiSan\Lock\TokenGenerator\RandomTokenGenerator;
+use Symfony\Component\Stopwatch\Stopwatch;
 
 $instance1 = new \Redis();
 $server->connect('127.0.0.1', 6379, 0.1);
@@ -108,7 +110,10 @@ $server->connect('127.0.0.1', 6379, 0.1);
 $instance2 = new \Redis();
 $server->connect('127.0.0.1', 6380, 0.1);
 
-$redLock = new RedLock([ $instance1, $instance2 ]);
+$tokenGenerator = new RandomTokenGenerator();
+$stopwatch = new Stopwatch();
+
+$redLock = new RedLock([ $instance1, $instance2 ], $tokenGenerator, $stopwatch);
 ```
 
 This class works as described earlier but has specificities due to the use of multiple `Redis` instances.

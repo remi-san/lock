@@ -58,12 +58,15 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     public function setUp()
     {
         $this->instance1 = \Mockery::mock(\Redis::class, function ($redis) {
+            /** @var Mock $redis */
             $redis->shouldReceive('isConnected')->andReturn(true);
         });
         $this->instance2 = \Mockery::mock(\Redis::class, function ($redis) {
+            /** @var Mock $redis */
             $redis->shouldReceive('isConnected')->andReturn(true);
         });
         $this->disconnectedInstance = \Mockery::mock(\Redis::class, function ($redis) {
+            /** @var Mock $redis */
             $redis->shouldReceive('isConnected')->andReturn(false);
         });
 
