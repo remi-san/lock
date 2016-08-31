@@ -194,7 +194,7 @@ final class RedLock implements Locker
      */
     private function isInstanceResourceLocked(\Redis $instance, $resource)
     {
-        return (bool) $instance->exists($resource);
+        return (bool) $instance->get($resource);
     }
 
     /**
@@ -316,7 +316,7 @@ final class RedLock implements Locker
     private static function getDrift($ttl)
     {
         // Add 2 milliseconds to the drift to account for Redis expires
-        // precision, which is 1 millisecond, plus 2 millisecond min drift
+        // precision, which is 1 millisecond, plus 1 millisecond min drift
         // for small TTLs.
 
         $redisExpiresPrecision = 2;

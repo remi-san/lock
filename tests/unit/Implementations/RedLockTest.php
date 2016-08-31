@@ -495,7 +495,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     private function itWillAssertKeyHasBeenFoundInInstanceOne($times)
     {
         $this->instance1
-            ->shouldReceive('exists')
+            ->shouldReceive('get')
             ->andReturn(true)
             ->times($times);
     }
@@ -503,7 +503,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     private function itWillAssertKeyHasBeenFoundInInstanceTwo($times)
     {
         $this->instance2
-            ->shouldReceive('exists')
+            ->shouldReceive('get')
             ->andReturn(true)
             ->times($times);
     }
@@ -511,7 +511,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     private function itWillAssertKeyHasNotBeenFoundInInstanceOne($times)
     {
         $this->instance1
-            ->shouldReceive('exists')
+            ->shouldReceive('get')
             ->andReturn(false)
             ->times($times);
     }
@@ -519,7 +519,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     private function itWillAssertKeyHasNotBeenFoundInInstanceTwo($times)
     {
         $this->instance2
-            ->shouldReceive('exists')
+            ->shouldReceive('get')
             ->andReturn(false)
             ->times($times);
     }
