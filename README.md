@@ -101,6 +101,7 @@ You can create a `Redis Locker` or `RedLock` by providing an array of connected 
 
 ```php
 use RemiSan\Lock\Implementations\RedLock;
+use RemiSan\Lock\Quorum\MajorityQuorum;
 use RemiSan\Lock\TokenGenerator\RandomTokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 
@@ -111,16 +112,17 @@ $instance2 = new \Redis();
 $server->connect('127.0.0.1', 6380, 0.1);
 
 $tokenGenerator = new RandomTokenGenerator();
+$quorum = new MajorityQuorum();
 $stopwatch = new Stopwatch();
 
-$redLock = new RedLock([ $instance1, $instance2 ], $tokenGenerator, $stopwatch);
+$redLock = new RedLock([ $instance1, $instance2 ], $tokenGenerator, $quorum, $stopwatch);
 ```
 
-This class works as described earlier but has specificities due to the use of multiple `Redis` instances.
+This class works as described earlier but has some specificity due to the use of multiple `Redis` instances.
 
 **Acquire a lock**
 
-The lock will be acquired only if more than half of the instances of `Redis` have been able to acquire the lock. (The calculation of the `quorum` is the minimum value between the number of instances and half the instances plus one - ie. for 4 instances, the quorum will be 3 / for 10 instances, it will be 6).
+The lock will be acquired only if the number of instances of `Redis` have been able to acquire the lock meet the quorum (the calculation of the `quorum` is made according to the implementation of `Quorum` passed to `RedLock`).
 
 **Assert if a lock exists**
 

@@ -6,6 +6,7 @@ use RemiSan\Lock\Exceptions\LockingException;
 use RemiSan\Lock\Exceptions\UnlockingException;
 use RemiSan\Lock\Lock;
 use RemiSan\Lock\Locker;
+use RemiSan\Lock\Quorum;
 use RemiSan\Lock\TokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 
@@ -20,26 +21,28 @@ final class RedLock implements Locker
     /** @var TokenGenerator */
     private $tokenGenerator;
 
+    /** @var Quorum */
+    private $quorum;
+
     /** @var Stopwatch */
     private $stopwatch;
-
-    /** @var int */
-    private $quorum;
 
     /**
      * RedLock constructor.
      *
      * @param \Redis[]       $instances      Array of pre-connected \Redis objects
      * @param TokenGenerator $tokenGenerator The token generator
+     * @param Quorum         $quorum         The quorum implementation to use
      * @param Stopwatch      $stopwatch      A way to measure time passed
      */
     public function __construct(
         array $instances,
         TokenGenerator $tokenGenerator,
+        Quorum $quorum,
         Stopwatch $stopwatch
     ) {
         $this->setInstances($instances);
-        $this->setQuorum();
+        $this->setQuorum($quorum);
 
         $this->tokenGenerator = $tokenGenerator;
         $this->stopwatch = $stopwatch;
@@ -250,11 +253,13 @@ final class RedLock implements Locker
 
     /**
      * Set the quorum based on the number of instances passed to the constructor.
+     *
+     * @param Quorum $quorum The quorum implementation to use
      */
-    private function setQuorum()
+    private function setQuorum(Quorum $quorum)
     {
-        $numberOfRedisInstances = count($this->instances);
-        $this->quorum = (int) round(min($numberOfRedisInstances, ($numberOfRedisInstances / 2) + 1));
+        $this->quorum = $quorum;
+        $this->quorum->init(count($this->instances));
     }
 
     /**
@@ -266,7 +271,7 @@ final class RedLock implements Locker
      */
     private function checkQuorum($instancesLocked)
     {
-        if ($instancesLocked < $this->quorum) {
+        if (!$this->quorum->isMet($instancesLocked)) {
             throw new LockingException('Quorum has not been met.');
         }
     }

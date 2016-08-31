@@ -7,6 +7,7 @@ use RemiSan\Lock\Exceptions\LockingException;
 use RemiSan\Lock\Exceptions\UnlockingException;
 use RemiSan\Lock\Implementations\RedLock;
 use RemiSan\Lock\Lock;
+use RemiSan\Lock\Quorum;
 use RemiSan\Lock\TokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 use Symfony\Component\Stopwatch\StopwatchEvent;
@@ -24,6 +25,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
     /** @var TokenGenerator | Mock */
     private $tokenGenerator;
+
+    /** @var Quorum | Mock */
+    private $quorum;
 
     /** @var Stopwatch | Mock */
     private $stopwatch;
@@ -72,6 +76,11 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->tokenGenerator = \Mockery::mock(TokenGenerator::class);
 
+        $this->quorum = \Mockery::mock(Quorum::class, function ($quorum) {
+            /** @var Mock $quorum */
+            $quorum->shouldReceive('init');
+        });
+
         $this->stopwatch = \Mockery::mock(Stopwatch::class);
         $this->stopwatchEvent = \Mockery::mock(StopwatchEvent::class);
 
@@ -88,6 +97,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         $this->classUnderTest = new RedLock(
             [ $this->instance1, $this->instance2 ],
             $this->tokenGenerator,
+            $this->quorum,
             $this->stopwatch
         );
     }
@@ -107,6 +117,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         new RedLock(
             [],
             $this->tokenGenerator,
+            $this->quorum,
             $this->stopwatch
         );
     }
@@ -121,6 +132,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         new RedLock(
             [ $this->disconnectedInstance ],
             $this->tokenGenerator,
+            $this->quorum,
             $this->stopwatch
         );
     }
@@ -136,6 +148,8 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->itWillSetValueOnRedisInstanceOneWithTtl(1);
         $this->itWillSetValueOnRedisInstanceTwoWithTtl(1);
+
+        $this->itWillMeetQuorum();
 
         $lock = $this->classUnderTest->lock($this->resource, $this->ttl, $this->retryDelay, $this->retryCount);
 
@@ -158,6 +172,8 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->itWillUnlockTheResourceOnInstanceOne(2);
         $this->itWillUnlockTheResourceOnInstanceTwo(2);
+
+        $this->itWillMeetQuorum();
 
         $this->setExpectedException(LockingException::class);
 
@@ -188,6 +204,8 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         $this->itWillUnlockTheResourceOnInstanceOne(2);
         $this->itWillUnlockTheResourceOnInstanceTwo(2);
 
+        $this->itWillNotMeetQuorum();
+
         $this->setExpectedException(LockingException::class);
 
         $stopwatch = new Stopwatch();
@@ -213,6 +231,8 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->itWillSetValueOnRedisInstanceOneWithoutTtl(1);
         $this->itWillSetValueOnRedisInstanceTwoWithoutTtl(1);
+
+        $this->itWillMeetQuorum();
 
         $lock = $this->classUnderTest->lock($this->resource, null, $this->retryDelay, $this->retryCount);
 
@@ -447,7 +467,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         $this->instance1
             ->shouldReceive('evaluate')
             ->with(
-                \Mockery::on(function () { return true; }),
+                \Mockery::on(function () {
+                    return true;
+                }),
                 [ $this->resource, $this->token ],
                 1
             )
@@ -460,7 +482,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
         $this->instance2
             ->shouldReceive('evaluate')
             ->with(
-                \Mockery::on(function () { return true; }),
+                \Mockery::on(function () {
+                    return true;
+                }),
                 [ $this->resource, $this->token ],
                 1
             )
@@ -498,5 +522,19 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->shouldReceive('exists')
             ->andReturn(false)
             ->times($times);
+    }
+
+    private function itWillMeetQuorum()
+    {
+        $this->quorum
+            ->shouldReceive('isMet')
+            ->andReturn(true);
+    }
+
+    private function itWillNotMeetQuorum()
+    {
+        $this->quorum
+            ->shouldReceive('isMet')
+            ->andReturn(false);
     }
 }
