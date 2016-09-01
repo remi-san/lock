@@ -2,14 +2,14 @@
 
 namespace RemiSan\Lock\LockStore;
 
-use RemiSan\Lock\LockStore;
 use RemiSan\Lock\Lock;
+use RemiSan\Lock\LockStore;
 
 class RedisLockStore implements LockStore
 {
     /** @var float */
     const CLOCK_DRIFT_FACTOR = 0.01;
-    
+
     /** @var int */
     const REDIS_EXPIRES_PRECISION = 2;
 
@@ -23,13 +23,13 @@ class RedisLockStore implements LockStore
      */
     public function __construct(\Redis $redis)
     {
-        if (! $redis->isConnected()) {
+        if (!$redis->isConnected()) {
             throw new \InvalidArgumentException('The Redis instance must be connected.');
         }
         $this->redis = $redis;
     }
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function set(Lock $lock, $ttl = null)
     {
@@ -43,7 +43,7 @@ class RedisLockStore implements LockStore
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function exists($resource)
     {
@@ -51,7 +51,7 @@ class RedisLockStore implements LockStore
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function delete(Lock $lock)
     {
@@ -71,14 +71,14 @@ class RedisLockStore implements LockStore
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function getDrift($ttl)
     {
         // Add 2 milliseconds to the drift to account for Redis expires
         // precision, which is 1 millisecond, plus 1 millisecond min drift
         // for small TTLs.
-        
+
         $minDrift = ($ttl) ? (int) ceil($ttl * self::CLOCK_DRIFT_FACTOR) : 0;
 
         return $minDrift + self::REDIS_EXPIRES_PRECISION;

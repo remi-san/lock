@@ -17,12 +17,12 @@ class MajorityQuorum implements Quorum
     private $quorum = null;
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function init($totalNumber)
     {
         if ($totalNumber < 1) {
-            throw new \InvalidArgumentException();
+            throw new \InvalidArgumentException('You must have at least one store.');
         }
 
         $this->total = $totalNumber;
@@ -30,14 +30,14 @@ class MajorityQuorum implements Quorum
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function isMet($numberOfSuccess)
     {
         if ($this->quorum === null) {
             throw new \RuntimeException('You must init the Quorum before querying it.');
         }
-        
+
         if ($numberOfSuccess < 0 ||
             $numberOfSuccess > $this->total) {
             throw new \InvalidArgumentException(

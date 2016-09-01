@@ -10,7 +10,7 @@ interface LockStore
      * @param Lock $lock
      * @param int  $ttl
      *
-     * @return boolean
+     * @return bool
      */
     public function set(Lock $lock, $ttl = null);
 
@@ -19,7 +19,7 @@ interface LockStore
      *
      * @param string $resource
      *
-     * @return boolean
+     * @return bool
      */
     public function exists($resource);
 
@@ -28,7 +28,7 @@ interface LockStore
      *
      * @param Lock $lock
      *
-     * @return boolean
+     * @return bool
      */
     public function delete(Lock $lock);
 

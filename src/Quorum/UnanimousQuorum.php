@@ -12,19 +12,19 @@ class UnanimousQuorum implements Quorum
     private $quorum = null;
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function init($totalNumber)
     {
         if ($totalNumber < 1) {
-            throw new \InvalidArgumentException();
+            throw new \InvalidArgumentException('You must have at least one store.');
         }
 
         $this->quorum = $totalNumber;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function isMet($numberOfSuccess)
     {

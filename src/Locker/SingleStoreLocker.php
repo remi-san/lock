@@ -2,16 +2,21 @@
 
 namespace RemiSan\Lock\Locker;
 
-use RemiSan\Lock\LockStore;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
+use Psr\Log\NullLogger;
 use RemiSan\Lock\Exceptions\LockingException;
 use RemiSan\Lock\Exceptions\UnlockingException;
 use RemiSan\Lock\Lock;
 use RemiSan\Lock\Locker;
+use RemiSan\Lock\LockStore;
 use RemiSan\Lock\TokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 
-final class SingleStoreLocker implements Locker
+final class SingleStoreLocker implements Locker, LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+
     /** @var LockStore */
     private $store;
 
@@ -36,6 +41,8 @@ final class SingleStoreLocker implements Locker
         $this->store = $store;
         $this->tokenGenerator = $tokenGenerator;
         $this->stopwatch = $stopwatch;
+
+        $this->logger = new NullLogger();
     }
 
     /**
@@ -50,6 +57,7 @@ final class SingleStoreLocker implements Locker
             try {
                 return $this->lockAndCheckQuorumAndTtl($lock, $ttl);
             } catch (LockingException $e) {
+                $this->logger->notice($e->getMessage(), ['resource' => $lock->getResource()]);
             }
 
             if ($tried++ === $retryCount) {
