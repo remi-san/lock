@@ -56,9 +56,31 @@ Usage
 
 **Create**
 
+You can chose between the Single-Store implementation:
 ```php
 use RemiSan\Lock\LockStore\RedisLockStore;
-use RemiSan\Lock\Locker\MultipleInstanceLocker;
+use RemiSan\Lock\Locker\SingleStoreLocker;
+use RemiSan\Lock\Quorum\MajorityQuorum;
+use RemiSan\Lock\TokenGenerator\RandomTokenGenerator;
+use Symfony\Component\Stopwatch\Stopwatch;
+
+$connection = new \Redis();
+$server->connect('127.0.0.1', 6379, 0.1);
+
+$tokenGenerator = new RandomTokenGenerator();
+$stopwatch = new Stopwatch();
+
+$redLock = new SingleStoreLocker(
+    new RedisLockStore($connection),
+    $tokenGenerator,
+    $stopwatch
+);
+```
+
+Or the Multiple-Store implementation:
+```php
+use RemiSan\Lock\LockStore\RedisLockStore;
+use RemiSan\Lock\Locker\MultipleStoreLocker;
 use RemiSan\Lock\Quorum\MajorityQuorum;
 use RemiSan\Lock\TokenGenerator\RandomTokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
@@ -73,7 +95,7 @@ $tokenGenerator = new RandomTokenGenerator();
 $quorum = new MajorityQuorum();
 $stopwatch = new Stopwatch();
 
-$redLock = new MultipleInstanceLocker(
+$redLock = new MultipleStoreLocker(
     [ new RedisLockStore($connection1), new RedisLockStore($connection2) ],
     $tokenGenerator,
     $quorum,
@@ -96,7 +118,8 @@ If the lock is acquired, it will return a `Lock` object describing it.
 
 If it failed being acquired, it will throw a `RemiSan\Lock\Exceptions\LockingException`.
 
-The lock will be acquired only if the number of instances that have been able to acquire the lock meet the quorum (the calculation of the `quorum` is made according to the implementation of `Quorum` passed to the `MultipleInstanceLocker`).
+
+*For the Multiple-Store*: The lock will be acquired only if the number of instances that have been able to acquire the lock meet the quorum (the calculation of the `quorum` is made according to the implementation of `Quorum` passed to the `MultipleInstanceLocker`).
 
 
 **Assert if a lock exists**
@@ -109,7 +132,7 @@ $isLocked = $locker->isLocked('my_resource_name');
 
 If the resource is still locked (lock has been acquired and ttl hasn't expired), it will return `true`, it will return false otherwise.
 
-If at least one connected instance has the lock, it will consider having the lock.
+*For the Multiple-Store*: If at least one connected instance has the lock, it will consider having the lock.
 
 
 **Release a lock**
@@ -124,7 +147,7 @@ If the lock is still active, it will release it. If it fails but the lock wasn't
 
 If it fails releasing the lock and the lock is still active, it will throw a `RemiSan\Lock\Exceptions\UnlockingException`.
 
-If at least one connected instance fails releasing the lock while still detaining it, the exception will be thrown.
+*For the Multiple-Store*: If at least one connected instance fails releasing the lock while still detaining it, the exception will be thrown.
 
 
 Redis LockStore

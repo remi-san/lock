@@ -17,7 +17,7 @@ class RedisLockStore implements LockStore
     private $redis;
 
     /**
-     * RedisConnection constructor.
+     * RedisLockStore constructor.
      *
      * @param \Redis $redis
      */

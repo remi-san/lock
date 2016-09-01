@@ -26,9 +26,9 @@ final class MultipleStoreLocker implements Locker
     private $stopwatch;
 
     /**
-     * RedLock constructor.
+     * MultipleStoreLocker constructor.
      *
-     * @param LockStore[]    $stores         Array of persistence system connections
+     * @param LockStore[]    $stores         Array of persistence stores for the locks
      * @param TokenGenerator $tokenGenerator The token generator
      * @param Quorum         $quorum         The quorum implementation to use
      * @param Stopwatch      $stopwatch      A way to measure time passed

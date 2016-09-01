@@ -220,8 +220,6 @@ class MultipleStoreLockerTest extends \PHPUnit_Framework_TestCase
         $this->assertNull($lock->getValidityEndTime());
     }
 
-    // TODO test other failing cases
-
     /**
      * @test
      */
@@ -292,7 +290,7 @@ class MultipleStoreLockerTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShoulFailIfUnlockFailsOnAStoreWhereTheResourceIsStillLocked()
+    public function itShouldFailIfUnlockFailsOnAStoreWhereTheResourceIsStillLocked()
     {
         $this->itWillUnlockTheResourceOnStoreOne(1);
         $this->itWillFailUnlockingTheResourceOnStoreTwo(1);
@@ -309,7 +307,7 @@ class MultipleStoreLockerTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShoulFailIfUnlockFailsOnFirstStoreWhereTheResourceIsStillLocked()
+    public function itShouldFailIfUnlockFailsOnFirstStoreWhereTheResourceIsStillLocked()
     {
         $this->itWillFailUnlockingTheResourceOnStoreOne(1);
         $this->itWillFailUnlockingTheResourceOnStoreTwo(0);
