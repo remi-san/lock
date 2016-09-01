@@ -10,12 +10,12 @@ Lock
 [![SensioLabsInsight](https://insight.sensiolabs.com/projects/45db8cbd-70a8-4c09-9b80-32b51ba92c86/mini.png)](https://insight.sensiolabs.com/projects/45db8cbd-70a8-4c09-9b80-32b51ba92c86)
 
 Description
-----------------
+-----------
 
 **`Lock`** is a library aimed at providing a simple and reliable way to lock resources.
 
 Main classes
------------------
+------------
 
 - `RemiSan\Lock\Locker` which provides an interface containing the following methods:
 	- `lock` to lock a resource for a given time (`ttl` - not mandatory), allowing to retry a certain amount of times until success.
@@ -28,7 +28,7 @@ Main classes
 	- `validityEndTime` the time (in milliseconds since EPOCH) at which the lock will be automatically released (if a ttl has been defined).
 
 Token Generators
-------------------------
+----------------
 
 As the `Locker` will need to generate a unique token to lock the `resource`, a `TokenGenerator` interface has been defined, and 2 implementations are available:
 
@@ -51,8 +51,19 @@ $tokenGenerator = new FixedTokenGenerator('my_token');
 echo $tokenGenerator->generateToken(); // 'my_token'
 ```
 
+Quorum
+------
+
+`Quorum` is used to determinate if enough `LockStores` have written the lock to consider it really locked.
+
+Two implementations are provided:
+- `MajorityQuorum` which will state quorum is met if more than half of the stores have written the lock.
+- `UnanimousQuorum` which will state quorum is met if all stores have written the lock.
+
+Quorum is only used when dealing with multiple stores.
+
 Usage
---------
+-----
 
 **Create**
 
@@ -60,7 +71,6 @@ You can chose between the Single-Store implementation:
 ```php
 use RemiSan\Lock\LockStore\RedisLockStore;
 use RemiSan\Lock\Locker\SingleStoreLocker;
-use RemiSan\Lock\Quorum\MajorityQuorum;
 use RemiSan\Lock\TokenGenerator\RandomTokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 
@@ -151,7 +161,7 @@ If it fails releasing the lock and the lock is still active, it will throw a `Re
 
 
 Redis LockStore
--------------------------------
+---------------
 Based on [Redlock-rb](https://github.com/antirez/redlock-rb) by [Salvatore Sanfilippo](https://github.com/antirez) and [ronnylt/redlock-php](https://github.com/ronnylt/redlock-php).
 
 This library implements the Redis-based distributed lock manager algorithm [described in this Redis article](http://redis.io/topics/distlock).
@@ -161,5 +171,5 @@ This lib provides a `RedisLockStore` implementing the `RedLock` mechanism.
 **DISCLAIMER**: As stated in the original `antirez` version, this code implements an algorithm which is currently a proposal, it was not formally analyzed. Make sure to understand how it works before using it in your production environments.
 
 Other LockStores
----------------------------------
+----------------
 That will come at some point, but it's not there yet.
