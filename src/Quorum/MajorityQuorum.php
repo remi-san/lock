@@ -14,7 +14,7 @@ class MajorityQuorum implements Quorum
     /**
      * @var int
      */
-    private $quorum;
+    private $quorum = null;
 
     /**
      * @inheritDoc
@@ -34,9 +34,15 @@ class MajorityQuorum implements Quorum
      */
     public function isMet($numberOfSuccess)
     {
+        if ($this->quorum === null) {
+            throw new \RuntimeException('You must init the Quorum before querying it.');
+        }
+        
         if ($numberOfSuccess < 0 ||
             $numberOfSuccess > $this->total) {
-            throw new \InvalidArgumentException();
+            throw new \InvalidArgumentException(
+                'Number of success cannot be inferior to zero or superior to the number of stores.'
+            );
         }
 
         return $numberOfSuccess >= $this->quorum;

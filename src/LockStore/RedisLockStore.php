@@ -1,11 +1,11 @@
 <?php
 
-namespace RemiSan\Lock\Connection;
+namespace RemiSan\Lock\LockStore;
 
-use RemiSan\Lock\Connection;
+use RemiSan\Lock\LockStore;
 use RemiSan\Lock\Lock;
 
-class RedisConnection implements Connection
+class RedisLockStore implements LockStore
 {
     /** @var float */
     const CLOCK_DRIFT_FACTOR = 0.01;
@@ -35,7 +35,7 @@ class RedisConnection implements Connection
     {
         $options = ['NX'];
 
-        if ($ttl) {
+        if ($ttl !== null && $ttl > 0) {
             $options['PX'] = (int) $ttl;
         }
 

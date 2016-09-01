@@ -3,23 +3,23 @@
 namespace RemiSan\Lock\Test\Locker;
 
 use Mockery\Mock;
-use RemiSan\Lock\Connection;
+use RemiSan\Lock\LockStore;
 use RemiSan\Lock\Exceptions\LockingException;
 use RemiSan\Lock\Exceptions\UnlockingException;
-use RemiSan\Lock\Locker\MultipleInstanceLocker;
+use RemiSan\Lock\Locker\MultipleStoreLocker;
 use RemiSan\Lock\Lock;
 use RemiSan\Lock\Quorum;
 use RemiSan\Lock\TokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 use Symfony\Component\Stopwatch\StopwatchEvent;
 
-class RedLockTest extends \PHPUnit_Framework_TestCase
+class MultipleStoreLockerTest extends \PHPUnit_Framework_TestCase
 {
-    /** @var Connection | Mock */
-    private $instance1;
+    /** @var LockStore | Mock */
+    private $store1;
 
-    /** @var Connection | Mock */
-    private $instance2;
+    /** @var LockStore | Mock */
+    private $store2;
 
     /** @var TokenGenerator | Mock */
     private $tokenGenerator;
@@ -51,7 +51,7 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /** @var int */
     private $originTime;
 
-    /** @var MultipleInstanceLocker */
+    /** @var MultipleStoreLocker */
     private $classUnderTest;
 
     /**
@@ -59,11 +59,14 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
      */
     public function setUp()
     {
-        $this->instance1 = \Mockery::mock(Connection::class, function ($instance) {
-            /** @var Mock $instance */
-            $instance->shouldReceive('getDrift')->andReturn(3);
+        $this->store1 = \Mockery::mock(LockStore::class, function ($store) {
+            /** @var Mock $store */
+            $store->shouldReceive('getDrift')->andReturn(2);
         });
-        $this->instance2 = \Mockery::mock(Connection::class);
+        $this->store2 = \Mockery::mock(LockStore::class, function ($store) {
+            /** @var Mock $store */
+            $store->shouldReceive('getDrift')->andReturn(3);
+        });
 
         $this->tokenGenerator = \Mockery::mock(TokenGenerator::class);
 
@@ -85,8 +88,8 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->originTime = 333;
 
-        $this->classUnderTest = new MultipleInstanceLocker(
-            [ $this->instance1, $this->instance2 ],
+        $this->classUnderTest = new MultipleStoreLocker(
+            [ $this->store1, $this->store2 ],
             $this->tokenGenerator,
             $this->quorum,
             $this->stopwatch
@@ -101,11 +104,11 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itNeedsAtLeastOneRedisInstanceToInstantiateTheClass()
+    public function itNeedsAtLeastOneStoreToInstantiateTheClass()
     {
         $this->setExpectedException(\InvalidArgumentException::class);
 
-        new MultipleInstanceLocker(
+        new MultipleStoreLocker(
             [],
             $this->tokenGenerator,
             $this->quorum,
@@ -116,14 +119,14 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldLockTheResourceIfAllRedisInstancesHaveBeenAbleToLockIt()
+    public function itShouldLockTheResourceIfAllStoresHaveBeenAbleToLockIt()
     {
         $this->itWillGenerateAToken();
 
         $this->itWillMeasureATimePassedLowerThanTtl();
 
-        $this->itWillSetValueOnRedisInstanceOneWithTtl(1);
-        $this->itWillSetValueOnRedisInstanceTwoWithTtl(1);
+        $this->itWillSetValueOnStoreOneWithTtl(1);
+        $this->itWillSetValueOnStoreTwoWithTtl(1);
 
         $this->itWillMeetQuorum();
 
@@ -143,11 +146,11 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->itWillMeasureATimePassedOverTtlAndDrift();
 
-        $this->itWillSetValueOnRedisInstanceOneWithTtl(2);
-        $this->itWillSetValueOnRedisInstanceTwoWithTtl(2);
+        $this->itWillSetValueOnStoreOneWithTtl(2);
+        $this->itWillSetValueOnStoreTwoWithTtl(2);
 
-        $this->itWillUnlockTheResourceOnInstanceOne(2);
-        $this->itWillUnlockTheResourceOnInstanceTwo(2);
+        $this->itWillUnlockTheResourceOnStoreOne(2);
+        $this->itWillUnlockTheResourceOnStoreTwo(2);
 
         $this->itWillMeetQuorum();
 
@@ -174,11 +177,11 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->itWillMeasureATimePassedLowerThanTtl();
 
-        $this->itWillSetValueOnRedisInstanceOneWithTtl(2);
-        $this->itWillFailSettingValueOnRedisInstanceTwoWithTtl(2);
+        $this->itWillSetValueOnStoreOneWithTtl(2);
+        $this->itWillFailSettingValueOnStoreTwoWithTtl(2);
 
-        $this->itWillUnlockTheResourceOnInstanceOne(2);
-        $this->itWillUnlockTheResourceOnInstanceTwo(2);
+        $this->itWillUnlockTheResourceOnStoreOne(2);
+        $this->itWillUnlockTheResourceOnStoreTwo(2);
 
         $this->itWillNotMeetQuorum();
 
@@ -205,8 +208,8 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
 
         $this->itWillMeasureATimePassedOverTtlAndDrift();
 
-        $this->itWillSetValueOnRedisInstanceOneWithoutTtl(1);
-        $this->itWillSetValueOnRedisInstanceTwoWithoutTtl(1);
+        $this->itWillSetValueOnStoreOneWithoutTtl(1);
+        $this->itWillSetValueOnStoreTwoWithoutTtl(1);
 
         $this->itWillMeetQuorum();
 
@@ -222,10 +225,10 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldAssertTheResourceIsLockedIfAtLeastOneInstanceHasTheResourceLocked()
+    public function itShouldAssertTheResourceIsLockedIfAtLeastOneStoresHasTheResourceLocked()
     {
-        $this->itWillAssertKeyHasNotBeenFoundInInstanceOne(1);
-        $this->itWillAssertKeyHasBeenFoundInInstanceTwo(1);
+        $this->itWillAssertKeyHasNotBeenFoundInStoreOne(1);
+        $this->itWillAssertKeyHasBeenFoundInStoreTwo(1);
 
         $isLocked = $this->classUnderTest->isLocked($this->resource);
 
@@ -235,10 +238,10 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldAssertTheResourceIsLockedIfTheFirstInstanceHasTheResourceLocked()
+    public function itShouldAssertTheResourceIsLockedIfTheFirstStoreHasTheResourceLocked()
     {
-        $this->itWillAssertKeyHasBeenFoundInInstanceOne(1);
-        $this->itWillAssertKeyHasBeenFoundInInstanceTwo(0);
+        $this->itWillAssertKeyHasBeenFoundInStoreOne(1);
+        $this->itWillAssertKeyHasBeenFoundInStoreTwo(0);
 
         $isLocked = $this->classUnderTest->isLocked($this->resource);
 
@@ -248,10 +251,10 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldAssertTheResourceIsNotLockedIfNoInstanceHasTheResourceLocked()
+    public function itShouldAssertTheResourceIsNotLockedIfNoStoreHasTheResourceLocked()
     {
-        $this->itWillAssertKeyHasNotBeenFoundInInstanceOne(1);
-        $this->itWillAssertKeyHasNotBeenFoundInInstanceTwo(1);
+        $this->itWillAssertKeyHasNotBeenFoundInStoreOne(1);
+        $this->itWillAssertKeyHasNotBeenFoundInStoreTwo(1);
 
         $isLocked = $this->classUnderTest->isLocked($this->resource);
 
@@ -261,10 +264,10 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldUnlockOnAllInstances()
+    public function itShouldUnlockOnAllStores()
     {
-        $this->itWillUnlockTheResourceOnInstanceOne(1);
-        $this->itWillUnlockTheResourceOnInstanceTwo(1);
+        $this->itWillUnlockTheResourceOnStoreOne(1);
+        $this->itWillUnlockTheResourceOnStoreTwo(1);
 
         $lock = new Lock($this->resource, $this->token);
 
@@ -274,12 +277,12 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldNotFailIfUnlockFailsOnAnInstanceWhereTheResourceIsNotLocked()
+    public function itShouldNotFailIfUnlockFailsOnAStoreWhereTheResourceIsNotLocked()
     {
-        $this->itWillUnlockTheResourceOnInstanceOne(1);
-        $this->itWillFailUnlockingTheResourceOnInstanceTwo(1);
+        $this->itWillUnlockTheResourceOnStoreOne(1);
+        $this->itWillFailUnlockingTheResourceOnStoreTwo(1);
 
-        $this->itWillAssertKeyHasNotBeenFoundInInstanceTwo(1);
+        $this->itWillAssertKeyHasNotBeenFoundInStoreTwo(1);
 
         $lock = new Lock($this->resource, $this->token);
 
@@ -289,12 +292,12 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShoulFailIfUnlockFailsOnAnInstanceWhereTheResourceIsStillLocked()
+    public function itShoulFailIfUnlockFailsOnAStoreWhereTheResourceIsStillLocked()
     {
-        $this->itWillUnlockTheResourceOnInstanceOne(1);
-        $this->itWillFailUnlockingTheResourceOnInstanceTwo(1);
+        $this->itWillUnlockTheResourceOnStoreOne(1);
+        $this->itWillFailUnlockingTheResourceOnStoreTwo(1);
 
-        $this->itWillAssertKeyHasBeenFoundInInstanceTwo(1);
+        $this->itWillAssertKeyHasBeenFoundInStoreTwo(1);
 
         $lock = new Lock($this->resource, $this->token);
 
@@ -306,12 +309,12 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShoulFailIfUnlockFailsOnFirstInstanceWhereTheResourceIsStillLocked()
+    public function itShoulFailIfUnlockFailsOnFirstStoreWhereTheResourceIsStillLocked()
     {
-        $this->itWillFailUnlockingTheResourceOnInstanceOne(1);
-        $this->itWillFailUnlockingTheResourceOnInstanceTwo(0);
+        $this->itWillFailUnlockingTheResourceOnStoreOne(1);
+        $this->itWillFailUnlockingTheResourceOnStoreTwo(0);
 
-        $this->itWillAssertKeyHasBeenFoundInInstanceOne(1);
+        $this->itWillAssertKeyHasBeenFoundInStoreOne(1);
 
         $lock = new Lock($this->resource, $this->token);
 
@@ -367,9 +370,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->andReturn($this->originTime);
     }
 
-    private function itWillSetValueOnRedisInstanceOneWithTtl($times)
+    private function itWillSetValueOnStoreOneWithTtl($times)
     {
-        $this->instance1
+        $this->store1
             ->shouldReceive('set')
             ->with(\Mockery::on(function (Lock $lock) {
                 $this->assertEquals($this->resource, $lock->getResource());
@@ -380,9 +383,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillSetValueOnRedisInstanceTwoWithTtl($times)
+    private function itWillSetValueOnStoreTwoWithTtl($times)
     {
-        $this->instance2
+        $this->store2
             ->shouldReceive('set')
             ->with(\Mockery::on(function (Lock $lock) {
                 $this->assertEquals($this->resource, $lock->getResource());
@@ -393,9 +396,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillSetValueOnRedisInstanceOneWithoutTtl($times)
+    private function itWillSetValueOnStoreOneWithoutTtl($times)
     {
-        $this->instance1
+        $this->store1
             ->shouldReceive('set')
             ->with(\Mockery::on(function (Lock $lock) {
                 $this->assertEquals($this->resource, $lock->getResource());
@@ -406,9 +409,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillSetValueOnRedisInstanceTwoWithoutTtl($times)
+    private function itWillSetValueOnStoreTwoWithoutTtl($times)
     {
-        $this->instance2
+        $this->store2
             ->shouldReceive('set')
             ->with(\Mockery::on(function (Lock $lock) {
                 $this->assertEquals($this->resource, $lock->getResource());
@@ -419,9 +422,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillFailSettingValueOnRedisInstanceTwoWithTtl($times)
+    private function itWillFailSettingValueOnStoreTwoWithTtl($times)
     {
-        $this->instance2
+        $this->store2
             ->shouldReceive('set')
             ->with(\Mockery::on(function (Lock $lock) {
                 $this->assertEquals($this->resource, $lock->getResource());
@@ -432,9 +435,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillUnlockTheResourceOnInstanceOne($times)
+    private function itWillUnlockTheResourceOnStoreOne($times)
     {
-        $this->instance1
+        $this->store1
             ->shouldReceive('delete')
             ->with(\Mockery::on(function (Lock $lock) {
                 $this->assertEquals($this->resource, $lock->getResource());
@@ -445,9 +448,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillUnlockTheResourceOnInstanceTwo($times)
+    private function itWillUnlockTheResourceOnStoreTwo($times)
     {
-        $this->instance2
+        $this->store2
             ->shouldReceive('delete')
             ->with(\Mockery::on(function (Lock $lock) {
                 $this->assertEquals($this->resource, $lock->getResource());
@@ -458,22 +461,9 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillFailUnlockingTheResourceOnInstanceOne($times)
+    private function itWillFailUnlockingTheResourceOnStoreOne($times)
     {
-        $this->instance1
-            ->shouldReceive('delete')
-            ->with(\Mockery::on(function (Lock $lock) {
-                $this->assertEquals($this->resource, $lock->getResource());
-                $this->assertEquals($this->token, $lock->getToken());
-                return true;
-            }))
-            ->andReturn(false)
-            ->times($times);
-    }
-
-    private function itWillFailUnlockingTheResourceOnInstanceTwo($times)
-    {
-        $this->instance2
+        $this->store1
             ->shouldReceive('delete')
             ->with(\Mockery::on(function (Lock $lock) {
                 $this->assertEquals($this->resource, $lock->getResource());
@@ -484,36 +474,49 @@ class RedLockTest extends \PHPUnit_Framework_TestCase
             ->times($times);
     }
 
-    private function itWillAssertKeyHasBeenFoundInInstanceOne($times)
+    private function itWillFailUnlockingTheResourceOnStoreTwo($times)
     {
-        $this->instance1
+        $this->store2
+            ->shouldReceive('delete')
+            ->with(\Mockery::on(function (Lock $lock) {
+                $this->assertEquals($this->resource, $lock->getResource());
+                $this->assertEquals($this->token, $lock->getToken());
+                return true;
+            }))
+            ->andReturn(false)
+            ->times($times);
+    }
+
+    private function itWillAssertKeyHasBeenFoundInStoreOne($times)
+    {
+        $this->store1
             ->shouldReceive('exists')
             ->with($this->resource)
             ->andReturn(true)
             ->times($times);
     }
 
-    private function itWillAssertKeyHasBeenFoundInInstanceTwo($times)
+    private function itWillAssertKeyHasBeenFoundInStoreTwo($times)
     {
-        $this->instance2
+        $this->store2
             ->shouldReceive('exists')
             ->with($this->resource)
             ->andReturn(true)
             ->times($times);
     }
 
-    private function itWillAssertKeyHasNotBeenFoundInInstanceOne($times)
+    private function itWillAssertKeyHasNotBeenFoundInStoreOne($times)
     {
-        $this->instance1
+        $this->store1
             ->shouldReceive('exists')
             ->with($this->resource)
             ->andReturn(false)
             ->times($times);
     }
 
-    private function itWillAssertKeyHasNotBeenFoundInInstanceTwo($times)
+    private function itWillAssertKeyHasNotBeenFoundInStoreTwo($times)
     {
-        $this->instance2
+        $this->store2
             ->shouldReceive('exists')
             ->with($this->resource)
             ->andReturn(false)

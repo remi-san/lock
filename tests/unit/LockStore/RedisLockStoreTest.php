@@ -3,10 +3,10 @@
 namespace RemiSan\Lock\Test\Connection;
 
 use Mockery\Mock;
-use RemiSan\Lock\Connection\RedisConnection;
+use RemiSan\Lock\LockStore\RedisLockStore;
 use RemiSan\Lock\Lock;
 
-class RedisConnectionTest extends \PHPUnit_Framework_TestCase
+class RedisLockStoreTest extends \PHPUnit_Framework_TestCase
 {
     /** @var \Redis | Mock */
     private $redis;
@@ -17,7 +17,7 @@ class RedisConnectionTest extends \PHPUnit_Framework_TestCase
     /** @var int */
     private $ttl;
 
-    /** @var RedisConnection */
+    /** @var RedisLockStore */
     private $classUnderTest;
 
     /**
@@ -33,7 +33,7 @@ class RedisConnectionTest extends \PHPUnit_Framework_TestCase
         $this->lock = new Lock('resource', 'token');
         $this->ttl = 150;
 
-        $this->classUnderTest = new RedisConnection($this->redis);
+        $this->classUnderTest = new RedisLockStore($this->redis);
     }
 
     public function tearDown()
@@ -53,7 +53,7 @@ class RedisConnectionTest extends \PHPUnit_Framework_TestCase
 
         $this->setExpectedException(\InvalidArgumentException::class);
 
-        $this->classUnderTest = new RedisConnection($this->redis);
+        $this->classUnderTest = new RedisLockStore($this->redis);
     }
 
     /**

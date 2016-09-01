@@ -2,7 +2,7 @@
 
 namespace RemiSan\Lock\Locker;
 
-use RemiSan\Lock\Connection;
+use RemiSan\Lock\LockStore;
 use RemiSan\Lock\Exceptions\LockingException;
 use RemiSan\Lock\Exceptions\UnlockingException;
 use RemiSan\Lock\Lock;
@@ -11,10 +11,10 @@ use RemiSan\Lock\Quorum;
 use RemiSan\Lock\TokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 
-final class MultipleInstanceLocker implements Locker
+final class MultipleStoreLocker implements Locker
 {
-    /** @var Connection[] */
-    private $instances = [];
+    /** @var LockStore[] */
+    private $stores = [];
 
     /** @var TokenGenerator */
     private $tokenGenerator;
@@ -28,18 +28,18 @@ final class MultipleInstanceLocker implements Locker
     /**
      * RedLock constructor.
      *
-     * @param Connection[]   $instances      Array of persistence system connections
+     * @param LockStore[]    $stores         Array of persistence system connections
      * @param TokenGenerator $tokenGenerator The token generator
      * @param Quorum         $quorum         The quorum implementation to use
      * @param Stopwatch      $stopwatch      A way to measure time passed
      */
     public function __construct(
-        array $instances,
+        array $stores,
         TokenGenerator $tokenGenerator,
         Quorum $quorum,
         Stopwatch $stopwatch
     ) {
-        $this->setInstances($instances);
+        $this->setStores($stores);
         $this->setQuorum($quorum);
 
         $this->tokenGenerator = $tokenGenerator;
@@ -56,7 +56,7 @@ final class MultipleInstanceLocker implements Locker
         $tried = 0;
         while (true) {
             try {
-                return $this->monitoredLockingOfAllInstances($lock, $ttl);
+                return $this->lockAndCheckQuorumAndTtlOnAllStores($lock, $ttl);
             } catch (LockingException $e) {
                 $this->resetLock($lock);
             }
@@ -76,8 +76,8 @@ final class MultipleInstanceLocker implements Locker
      */
     public function isLocked($resource)
     {
-        foreach ($this->instances as $instance) {
-            if ($instance->exists((string) $resource)) {
+        foreach ($this->stores as $store) {
+            if ($store->exists((string) $resource)) {
                 return true;
             }
         }
@@ -90,9 +90,9 @@ final class MultipleInstanceLocker implements Locker
      */
     public function unlock(Lock $lock)
     {
-        foreach ($this->instances as $instance) {
-            if (!$instance->delete($lock)) {
-                if ($instance->exists($lock->getResource())) {
+        foreach ($this->stores as $store) {
+            if (!$store->delete($lock)) {
+                if ($store->exists($lock->getResource())) {
                     // Only throw an exception if the lock is still present
                     throw new UnlockingException('Failed releasing the lock.');
                 }
@@ -101,10 +101,10 @@ final class MultipleInstanceLocker implements Locker
     }
 
     /**
-     * Try locking all connected instances.
+     * Try locking resource on all stores.
      *
-     * Measure the time to do it and reject if not enough connected instance have successfully
-     * locked the resource or if time to lock all instances have exceeded the ttl.
+     * Measure the time to do it and reject if not enough stores have successfully
+     * locked the resource or if time to lock on all stores have exceeded the ttl.
      *
      * @param Lock $lock The lock instance
      * @param int  $ttl  Time to live in milliseconds
@@ -113,13 +113,13 @@ final class MultipleInstanceLocker implements Locker
      *
      * @return Lock
      */
-    private function monitoredLockingOfAllInstances(Lock $lock, $ttl)
+    private function lockAndCheckQuorumAndTtlOnAllStores(Lock $lock, $ttl)
     {
         $timeMeasure = $this->stopwatch->start($lock->getToken());
-        $instancesLocked = $this->lockInstances($lock, $ttl);
+        $storesLocked = $this->lockOnAllStores($lock, $ttl);
         $timeMeasure->stop();
 
-        $this->checkQuorum($instancesLocked);
+        $this->checkQuorum($storesLocked);
 
         if ($ttl) {
             $this->checkTtl($timeMeasure->getDuration(), $ttl);
@@ -130,78 +130,77 @@ final class MultipleInstanceLocker implements Locker
     }
 
     /**
-     * Lock resource in connected instances and count how many instance did it with success.
+     * Lock resource on all stores and count how many stores did it with success.
      *
      * @param Lock $lock The lock instance
      * @param int  $ttl  Time to live in milliseconds
      *
-     * @return int The number of instances locked
+     * @return int The number of stores on which the resource has been locked
      */
-    private function lockInstances(Lock $lock, $ttl)
+    private function lockOnAllStores(Lock $lock, $ttl)
     {
-        $instancesLocked = 0;
+        $storesLocked = 0;
 
-        foreach ($this->instances as $instance) {
-            if ($instance->set($lock, $ttl)) {
-                ++$instancesLocked;
+        foreach ($this->stores as $store) {
+            if ($store->set($lock, $ttl)) {
+                ++$storesLocked;
             }
         }
 
-        return $instancesLocked;
+        return $storesLocked;
     }
 
     /**
-     * Unlock the resource on all Redis instances.
+     * Unlock the resource on all stores.
      *
      * @param Lock $lock The lock to release
      */
     private function resetLock($lock)
     {
-        foreach ($this->instances as $instance) {
-            $instance->delete($lock);
+        foreach ($this->stores as $store) {
+            $store->delete($lock);
         }
     }
 
     /**
-     * Init all Redis instances passed to the constructor.
+     * Init all stores passed to the constructor.
      *
-     * If no Redis instance is given, it will return a InvalidArgumentException.
-     * If one or more Redis instance is not connected, it will return a InvalidArgumentException.
+     * If no store is given, it will return an InvalidArgumentException.
      *
-     * @param \Redis[] $instances The connected Redis instances
+     * @param LockStore[] $stores The lock stores
      *
      * @throws \InvalidArgumentException
      */
-    private function setInstances(array $instances)
+    private function setStores(array $stores)
     {
-        if (count($instances) === 0) {
-            throw new \InvalidArgumentException('You must provide at least one Redis instance.');
+        if (count($stores) === 0) {
+            throw new \InvalidArgumentException('You must provide at least one LockStore.');
         }
 
-        $this->instances = $instances;
+        $this->stores = $stores;
     }
 
     /**
-     * Set the quorum based on the number of instances passed to the constructor.
+     * Set the quorum based on the number of stores passed to the constructor.
      *
      * @param Quorum $quorum The quorum implementation to use
      */
     private function setQuorum(Quorum $quorum)
     {
         $this->quorum = $quorum;
-        $this->quorum->init(count($this->instances));
+        $this->quorum->init(count($this->stores));
     }
 
     /**
-     * Check if the number of instances that have been locked reach the quorum.
+     * Check if the number of stores where the resource has been locked meet the quorum.
      *
-     * @param int $instancesLocked The number of instances that have been locked
+     * @param int $storesLocked The number of stores on which the resource has been locked
      *
      * @throws LockingException
      */
-    private function checkQuorum($instancesLocked)
+    private function checkQuorum($storesLocked)
     {
-        if (!$this->quorum->isMet($instancesLocked)) {
+        if (!$this->quorum->isMet($storesLocked)) {
             throw new LockingException('Quorum has not been met.');
         }
     }
@@ -239,12 +238,16 @@ final class MultipleInstanceLocker implements Locker
     /**
      * Get the drift time based on ttl in ms.
      *
+     * Return the max drift time of all stores
+     *
      * @param int $ttl The time to live in milliseconds
      *
      * @return float
      */
     private function getDrift($ttl)
     {
-        return array_values($this->instances)[0]->getDrift($ttl);
+        return max(array_map(function (LockStore $store) use ($ttl) {
+            return $store->getDrift($ttl);
+        }, $this->stores));
     }
 }

@@ -35,6 +35,16 @@ class MajorityQuorumTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
+    public function itShouldNotBeAbleToQueryTheQuorumWithoutInitializingIt()
+    {
+        $this->setExpectedException(\RuntimeException::class);
+
+        $this->assertFalse($this->classUnderTest->isMet(1));
+    }
+
+    /**
+     * @test
+     */
     public function itShouldNotBeAbleToHaveLessSuccessesThanZero()
     {
         $this->classUnderTest->init(1);
@@ -47,7 +57,7 @@ class MajorityQuorumTest extends \PHPUnit_Framework_TestCase
     /**
      * @test
      */
-    public function itShouldNotBeAbleToHaveMoreSuccessesThanTotalInstances()
+    public function itShouldNotBeAbleToHaveMoreSuccessesThanTotalStores()
     {
         $this->classUnderTest->init(1);
 

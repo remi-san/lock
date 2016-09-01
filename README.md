@@ -57,16 +57,16 @@ Usage
 **Create**
 
 ```php
-use RemiSan\Lock\Connection\RedisConnection;
+use RemiSan\Lock\LockStore\RedisLockStore;
 use RemiSan\Lock\Locker\MultipleInstanceLocker;
 use RemiSan\Lock\Quorum\MajorityQuorum;
 use RemiSan\Lock\TokenGenerator\RandomTokenGenerator;
 use Symfony\Component\Stopwatch\Stopwatch;
 
-$instance1 = new \Redis();
+$connection1 = new \Redis();
 $server->connect('127.0.0.1', 6379, 0.1);
 
-$instance2 = new \Redis();
+$connection2 = new \Redis();
 $server->connect('127.0.0.1', 6380, 0.1);
 
 $tokenGenerator = new RandomTokenGenerator();
@@ -74,7 +74,7 @@ $quorum = new MajorityQuorum();
 $stopwatch = new Stopwatch();
 
 $redLock = new MultipleInstanceLocker(
-    [ new RedisConnection($instance1), new RedisConnection($instance2) ],
+    [ new RedisLockStore($connection1), new RedisLockStore($connection2) ],
     $tokenGenerator,
     $quorum,
     $stopwatch
@@ -127,16 +127,16 @@ If it fails releasing the lock and the lock is still active, it will throw a `Re
 If at least one connected instance fails releasing the lock while still detaining it, the exception will be thrown.
 
 
-Redis Connection
+Redis LockStore
 -------------------------------
 Based on [Redlock-rb](https://github.com/antirez/redlock-rb) by [Salvatore Sanfilippo](https://github.com/antirez) and [ronnylt/redlock-php](https://github.com/ronnylt/redlock-php).
 
 This library implements the Redis-based distributed lock manager algorithm [described in this Redis article](http://redis.io/topics/distlock).
 
-This lib provides a `RedisConnection` implementing the `RedLock` mechanism.
+This lib provides a `RedisLockStore` implementing the `RedLock` mechanism.
 
 **DISCLAIMER**: As stated in the original `antirez` version, this code implements an algorithm which is currently a proposal, it was not formally analyzed. Make sure to understand how it works before using it in your production environments.
 
-Other Connections
+Other LockStores
 ---------------------------------
 That will come at some point, but it's not there yet.

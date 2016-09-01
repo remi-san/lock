@@ -2,7 +2,7 @@
 
 namespace RemiSan\Lock;
 
-interface Connection
+interface LockStore
 {
     /**
      * Set the lock.

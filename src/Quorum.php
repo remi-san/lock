@@ -5,7 +5,7 @@ namespace RemiSan\Lock;
 interface Quorum
 {
     /**
-     * Init the quorum wth the total number of instances.
+     * Init the quorum wth the total number of stores.
      *
      * @param int $totalNumber
      */
