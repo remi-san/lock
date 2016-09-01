@@ -140,7 +140,7 @@ You can ask the `Locker` if a resource is still locked.
 $isLocked = $locker->isLocked('my_resource_name');
 ```
 
-If the resource is still locked (lock has been acquired and ttl hasn't expired), it will return `true`, it will return false otherwise.
+If the resource is still locked (lock has been acquired and ttl hasn't expired), it will return `true`, it will return `false` otherwise.
 
 *For the Multiple-Store*: If at least one connected instance has the lock, it will consider having the lock.
 
